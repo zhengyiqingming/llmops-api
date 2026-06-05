@@ -13,10 +13,10 @@ import dotenv
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import GenerationChunk, ChatGenerationChunk, LLMResult
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_deepseek import ChatDeepSeek
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.callbacks import StdOutCallbackHandler, FileCallbackHandler, BaseCallbackHandler
+from langchain_openai import ChatOpenAI
 
 dotenv.load_dotenv()
 
@@ -58,7 +58,7 @@ class LLMOpsCallbackHandler(BaseCallbackHandler):
 prompt = ChatPromptTemplate.from_template("{query}")
 
 # 2.构建大语言模型
-llm = ChatDeepSeek(model="deepseek-chat")
+llm = ChatOpenAI(model="deepseek-chat")
 
 # 3.构建链
 chain = {"query": RunnablePassthrough()} | prompt | llm | StrOutputParser()

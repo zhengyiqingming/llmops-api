@@ -6,8 +6,8 @@
 @File : response.py
 """
 from dataclasses import field, dataclass
-from typing import Any
-from flask import jsonify
+from typing import Any, Union, Generator
+from flask import jsonify, stream_with_context, Response as FlaskResponse
 
 from .http_code import HttpCode
 
@@ -26,7 +26,7 @@ def json(data: Response = None):
     return jsonify(data), 200
 
 
-def sucess_json(data: Any = None):
+def success_json(data: Any = None):
     """成功数据响应"""
     return json(Response(code=HttpCode.SUCCESS, message="", data=data))
 
@@ -37,7 +37,7 @@ def fail_json(data: Any = None):
 
 
 def validate_error_json(errors: dict = None):
-    """数据验证错误"""
+    """数据验证错误响应"""
     first_key = next(iter(errors))
     if first_key is not None:
         msg = errors.get(first_key)[0]
@@ -51,7 +51,7 @@ def message(code: HttpCode = None, msg: str = ""):
     return json(Response(code=code, message=msg, data={}))
 
 
-def sucess_message(msg: str = ""):
+def success_message(msg: str = ""):
     """成功的消息响应"""
     return message(code=HttpCode.SUCCESS, msg=msg)
 
@@ -74,3 +74,22 @@ def unauthorized_message(msg: str = ""):
 def forbidden_message(msg: str = ""):
     """无权限消息响应"""
     return message(code=HttpCode.FORBIDDEN, msg=msg)
+
+
+def compact_generate_response(response: Union[Response, Generator]) -> FlaskResponse:
+    """统一合并处理块输出以及流式事件输出"""
+    # 1.检测下是否为块输出（Response）
+    if isinstance(response, Response):
+        return json(response)
+    else:
+        # 2.response格式为生成器，代表本地响应需要执行流式事件输出
+        def generate() -> Generator:
+            """构建generate函数，流式从response中获取数据"""
+            yield from response
+
+        # 3.返回携带上下文的流式事件输出
+        return FlaskResponse(
+            stream_with_context(generate()),
+            status=200,
+            mimetype="text/event-stream",
+        )

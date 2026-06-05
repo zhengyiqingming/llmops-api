@@ -12,9 +12,15 @@ from pkg.response import HttpCode
 class TestAppHandle:
     """app控制器的测试类"""
 
-    @pytest.mark.parametrize("query", [None, "你好，你是谁？"])
-    def test_completion(self, query, client):
-        resp = client.post("/app/completion", json={"query": query})
+    @pytest.mark.parametrize(
+        "app_id, query",
+        [
+            ("6fa459ea-ee8a-3ca4-894e-db77e160355e", None),
+            ("6fa459ea-ee8a-3ca4-894e-db77e160355e", "请简单介绍一下LLMOps")
+        ]
+    )
+    def test_completion(self, app_id, query, client):
+        resp = client.post(f"/apps/{app_id}/debug", json={"query": query})
         assert resp.status_code == 200
         if query is None:
             assert resp.json.get("code") == HttpCode.VALIDATE_ERROR

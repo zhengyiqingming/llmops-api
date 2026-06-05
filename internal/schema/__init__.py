@@ -6,5 +6,6 @@
 @File : __init__.py.py
 """
 from internal.schema.app_schema import CompletionReq
+from .schema import ListField
 
-__all__ = ['CompletionReq']
+__all__ = ['CompletionReq', 'ListField']

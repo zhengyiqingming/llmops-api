@@ -5,8 +5,18 @@
 @Author : 751363075@qq.com
 @File : __init__.py.py
 """
-from .app import App
+from .account import Account, AccountOAuth
+from .api_tool import ApiTool, ApiToolProvider
+from .app import App, AppDatasetJoin
+from .dataset import Dataset, Document, Segment, KeywordTable, DatasetQuery, ProcessRule
+from .upload_file import UploadFile
+from .conversation import Conversation, Message, MessageAgentThought
 
 __all__ = [
-    'App',
+    'App', "AppDatasetJoin",
+    'ApiTool', 'ApiToolProvider',
+    'UploadFile',
+    "Dataset", "Document", "Segment", "KeywordTable", "DatasetQuery", "ProcessRule",
+    "Conversation", "Message", "MessageAgentThought",
+    "Account", "AccountOAuth",
 ]

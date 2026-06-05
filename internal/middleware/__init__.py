@@ -5,3 +5,6 @@
 @Author : 751363075@qq.com
 @File : __init__.py.py
 """
+from .middleware import Middleware
+
+__all__ = ['Middleware']

@@ -9,14 +9,14 @@ from typing import Any
 
 import dotenv
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 
 dotenv.load_dotenv()
 
 # 1.构建组件
 prompt = ChatPromptTemplate.from_template("{query}")
-llm = ChatDeepSeek(model="deepseek-chat")
+llm = ChatOpenAI(model="deepseek-chat")
 parser = StrOutputParser()
 
 

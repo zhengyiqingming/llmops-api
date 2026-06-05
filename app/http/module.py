@@ -5,17 +5,28 @@
 @Author : 751363075@qq.com
 @File : module.py
 """
+from redis import Redis
+
 from pkg.sqlalchemy import SQLAlchemy
-from injector import Module, Binder
+from injector import Module, Binder, Injector
 
 from internal.extension.database_extension import db
+from internal.extension.redis_extension import redis_client
 from flask_migrate import Migrate
 from internal.extension.migrate_extension import migrate
+from flask_login import LoginManager
+from internal.extension.login_extension import login_manager
 
 
 class ExtensionModule(Module):
     """扩展模块的依赖注入"""
 
     def configure(self, binder: Binder) -> None:
+        # 将类声明绑定到实例上
         binder.bind(SQLAlchemy, to=db)
         binder.bind(Migrate, to=migrate)
+        binder.bind(Redis, to=redis_client)
+        binder.bind(LoginManager, to=login_manager)
+
+
+injector = Injector([ExtensionModule])
