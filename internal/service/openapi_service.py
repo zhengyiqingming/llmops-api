@@ -1,0 +1,250 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+@Time : 2026/7/17 16:09
+@Author : 751363075@qq.com
+@File : openapi_service.py
+"""
+import json
+from threading import Thread
+from typing import Generator
+
+from flask import current_app
+from injector import inject
+from dataclasses import dataclass
+
+from langchain_core.messages import HumanMessage
+
+from pkg.response import Response
+from pkg.sqlalchemy import SQLAlchemy
+from .language_model_service import LanguageModelService
+from .conversation_service import ConversationService
+from .retrieval_service import RetrievalService
+from .app_service import AppService
+from .app_config_service import AppConfigService
+from .base_service import BaseService
+from ..core.agent.agents import FunctionCallAgent, ReACTAgent
+from ..core.agent.entities.agent_entity import AgentConfig
+from ..core.agent.entities.queue_entity import QueueEvent
+from ..core.language_model.entities.model_entity import ModelFeature
+from ..core.memory import TokenBufferMemory
+from ..entity.app_entity import AppStatus
+from ..entity.conversation_entity import InvokeFrom, MessageStatus
+from ..entity.dataset_entity import RetrievalSource
+from ..exception import NotFoundException, ForbiddenException
+from ..model import Account, EndUser, Conversation, Message
+from ..schema.openapi_schema import OpenAPIChatReq
+
+
+@inject
+@dataclass
+class OpenAPIService(BaseService):
+    """开放API服务"""
+    db: SQLAlchemy
+    app_service: AppService
+    app_config_service: AppConfigService
+    retrieval_service: RetrievalService
+    conversation_service: ConversationService
+    language_model_service: LanguageModelService
+
+    def chat(self, req: OpenAPIChatReq, account: Account):
+        """根据传递的请求+账号信息发起聊天会话，返回内容为块信息或者生成器"""
+        # 1.判断当前应用是否属于当前账号
+        app = self.app_service.get_app(req.app_id.data, account)
+        app_id = app.id
+        # 2.判断当前应用是否已发布
+        if app.status != AppStatus.PUBLISHED:
+            raise NotFoundException("该应用不存在或未发布，请核实后重试")
+
+        # 3.判断是否存在了终端用户，如果传递了则检测终端用户关联的应用
+        if req.end_user_id.data:
+            end_user = self.get(EndUser, req.end_user_id.data)
+            if not end_user or end_user.app_id != app_id:
+                raise ForbiddenException("当前账户不存在或不属于该应用，请核实后重试")
+        else:
+            # 4.如果不存在，则创建一个终端用户
+            end_user = self.create(
+                EndUser,
+                **{"tenant_id": account.id, "app_id": app_id}
+            )
+        end_user_id = end_user.id  # 在Session仍活跃时提取值
+        # 5.检测是否传递了会话id，如果传递了则需要检测会话的归属信息
+        if req.conversation_id.data:
+            conversation = self.get(Conversation, req.conversation_id.data)
+            if (
+                    not conversation
+                    or conversation.app_id != app_id
+                    or conversation.invoke_from != InvokeFrom.SERVICE_API
+                    or conversation.created_by != end_user_id
+            ):
+                raise ForbiddenException("该会话不存在，或者不属于该应用/终端用户/开放API调用方式")
+
+        else:
+            # 6.如果不存在则创建会话信息
+            conversation = self.create(Conversation, **{
+                "app_id": app_id,
+                "name": "New Conversation",
+                "invoke_from": InvokeFrom.SERVICE_API,
+                "created_by": end_user_id,
+            })
+
+        # 7.获取校验后的运行时配置
+        app_config = self.app_config_service.get_app_config(app)
+        print("app_config:", app_config)
+        # 8.新建一条消息记录
+        message = self.create(Message, **{
+            "app_id": app_id,
+            "conversation_id": conversation.id,
+            "invoke_from": InvokeFrom.SERVICE_API,
+            "created_by": end_user_id,
+            "query": req.query.data,
+            "status": MessageStatus.NORMAL,
+        })
+        message_id = message.id
+
+        # 9.从语言模型中根据模型配置获取LLM模型实例
+        llm = self.language_model_service.load_language_model(app_config.get("model_config", {}))
+
+        # 10.实例化tokenBufferMemory,用于提取短期记忆
+        token_buffer_memory = TokenBufferMemory(
+            db=self.db,
+            conversation=conversation,
+            model_instance=llm,
+        )
+        history = token_buffer_memory.get_history_prompt_messages(
+            messages_limit=app_config["dialog_round"],
+        )
+
+        # 11.将草稿配置中的tools转换成Langchain工具
+        tools = self.app_config_service.get_langchain_tools_by_tools_config(app_config["tools"])
+
+        # 12.检测是否关联了知识库
+        if app_config["datasets"]:
+            # 13.构建langchain知识库检索工具：
+            dataset_retrieval = self.retrieval_service.create_langchain_tool_from_search(
+                flask_app=current_app._get_current_object(),
+                dataset_ids=[dataset["id"] for dataset in app_config["datasets"]],
+                account_id=account.id,
+                retriever_source=RetrievalSource.APP,
+                **app_config["retrieval_config"],
+            )
+            tools.append(dataset_retrieval)
+
+        # 10.根据LLM是否支持tool_call决定使用不同的Agent
+        agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
+        print("long_term_memory--enable:", app_config["long_term_memory"]["enable"])
+        agent = agent_class(
+            llm=llm,
+            agent_config=AgentConfig(
+                user_id=account.id,
+                invoke_from=InvokeFrom.DEBUGGER,
+                preset_prompt=app_config["preset_prompt"],
+                enable_long_term_memory=app_config["long_term_memory"]["enable"],
+                tools=tools,
+                review_config=app_config["review_config"],
+            ),
+        )
+
+        # 15.定义智能体状态基础数据
+        agent_state = {
+            "messages": [HumanMessage(req.query.data)],
+            "history": history,
+            "long_term_memory": conversation.summary,
+        }
+
+        # 16.根据stream类型差异执行不同的代码
+        if req.stream.data is True:
+            agent_thoughts_dict = {}
+
+            # 如果在函数内部去写，会用到yield关键字，如果一个函数用到yield关键字，那么它的返回类型一定是生成器
+            def handle_stream() -> Generator:
+                """流式事件处理，在Python中，如果一个函数用到yield关键字，那么它的返回类型一定是生成器"""
+                for agent_thought in agent.stream(agent_state):
+                    # 提取thought以及answer
+                    event_id = str(agent_thought.id)
+
+                    # 将数据填充到agent_thought中，便于存储到数据库服务中
+                    if agent_thought.event != QueueEvent.PING:
+                        # 13.除了agent_message数据为叠加，其他均为直接返回
+                        if agent_thought.event == QueueEvent.AGENT_MESSAGE:
+                            if event_id not in agent_thoughts_dict:  # 表示第一次添加
+                                # 1初始化智能体消息事件
+                                agent_thoughts_dict[event_id] = agent_thought
+                            else:
+                                # 叠加智能体消息（同一个event_id的消息叠加起来）
+                                agent_thoughts_dict[event_id] = agent_thoughts_dict[event_id].model_copy(update={
+                                    "thought": agent_thoughts_dict[event_id].thought + agent_thought.thought,
+                                    "answer": agent_thoughts_dict[event_id].answer + agent_thought.answer,
+                                    "latency": agent_thought.latency,
+                                })
+
+                        else:
+                            # 处理其他类型事件的消息
+                            agent_thoughts_dict[event_id] = agent_thought
+
+                    data = {
+                        **agent_thought.model_dump(include={
+                            "event", "thought", "observation", "tool", "tool_input", "answer", "latency",
+                        }),
+                        "id": event_id,
+                        "end_user_id": str(end_user_id),
+                        "conversation_id": str(conversation.id),
+                        "message_id": str(message_id),
+                        "task_id": str(agent_thought.task_id),
+                    }
+                    yield f"event:{agent_thought.event}\ndata:{json.dumps(data)}\n\n"
+
+                # 22.循环将消息以及推理过程添加到数据库,装入子线程，不会等到里面逻辑完成之后才结束响应，用户在前面可以发起一个新的响应
+                thread = Thread(
+                    target=self.conversation_service.save_agent_thoughts,
+                    kwargs={
+                        "flask_app": current_app._get_current_object(),
+                        "account_id": account.id,
+                        "app_id": app_id,
+                        "app_config": app_config,
+                        "conversation_id": conversation.id,
+                        "message_id": message_id,
+                        "agent_thoughts": [agent_thought for agent_thought in agent_thoughts_dict.values()],
+                    }
+                )
+                thread.start()
+
+            return handle_stream()
+
+        # 17.非流式输出（块输出,req.stream为false）
+        agent_result = agent.invoke(agent_state)
+
+        # 18.将消息及推理过程添加到数据库
+        thread = Thread(
+            target=self.conversation_service.save_agent_thoughts,
+            kwargs={
+                "flask_app": current_app._get_current_object(),
+                "account_id": account.id,
+                "app_id": app_id,
+                "app_config": app_config,
+                "conversation_id": conversation.id,
+                "message_id": message_id,
+                "agent_thoughts": agent_result.agent_thoughts,
+            }
+        )
+        thread.start()
+
+        return Response(data={
+            "id": str(message_id),
+            "end_user_id": str(end_user_id),
+            "conversation_id": str(conversation.id),
+            "query": req.query.data,
+            "answer": agent_result.answer,
+            "total_token_count": 0,
+            "latency": agent_result.latency,
+            "agent_thoughts": [{
+                "id": str(agent_thought.id),
+                "event": agent_thought.event,
+                "thought": agent_thought.thought,
+                "observation": agent_thought.observation,
+                "tool": agent_thought.tool,
+                "tool_input": agent_thought.tool_input,
+                "latency": agent_thought.latency,
+                "created_at": 0,
+            } for agent_thought in agent_result.agent_thoughts],
+        })

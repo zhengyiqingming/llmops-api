@@ -24,6 +24,17 @@ from .retrieval_service import RetrievalService
 from .conversation_service import ConversationService
 from .jwt_service import JwtService
 from .account_service import AccountService
+from .oauth_service import OAuthService
+from .ai_service import AIService
+from .api_key_service import ApiKeyService
+from .app_config_service import AppConfigService
+from .openapi_service import OpenAPIService
+from .builtin_app_service import BuiltinAppService
+from .workflow_service import WorkflowService
+from .language_model_service import LanguageModelService
+from .assistant_agent_service import AssistantAgentService
+from .faiss_service import FaissService
+from .analysis_service import AnalysisService
 
 __all__ = [
     "BaseService",
@@ -45,4 +56,15 @@ __all__ = [
     "ConversationService",
     "JwtService",
     "AccountService",
+    "OAuthService",
+    "AIService",
+    "ApiKeyService",
+    "AppConfigService",
+    "OpenAPIService",
+    "BuiltinAppService",
+    "WorkflowService",
+    "LanguageModelService",
+    "AssistantAgentService",
+    "FaissService",
+    "AnalysisService",
 ]

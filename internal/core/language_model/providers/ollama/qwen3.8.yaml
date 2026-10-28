@@ -1,0 +1,28 @@
+model: qwen3.8:latest
+label: 通义千问3.8:latest
+model_type: chat
+features:
+  # - tool_call
+  - agent_thought
+#上下文窗口长度
+context_window: 131072
+max_output_tokens: 8196
+attributes:
+  model: "qwen3.8:latest"
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    use_template: top_p
+  - name: presence_penalty #存在惩罚
+    use_template: presence_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    default: 4096
+    max: 8196
+metadata:
+  pricing:
+    input: 0.0000
+    output: 0.0000
+    unit: 0.001
+    currency: RMB

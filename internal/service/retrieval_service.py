@@ -7,6 +7,7 @@
 """
 from uuid import UUID
 
+from flask import Flask
 from injector import inject
 from dataclasses import dataclass
 
@@ -16,12 +17,16 @@ from pkg.sqlalchemy import SQLAlchemy
 from .vector_database_service import VectorDataBaseService
 from .jieba_service import JiebaService
 from .base_service import BaseService
-from ..entity.dataset_entity import RetrieverStrategy, RetrieverSource
+from ..core.agent.entities.agent_entity import DATASET_RETRIEVAL_TOOL_NAME
+from ..entity.dataset_entity import RetrievalStrategy, RetrievalSource
 from langchain_core.documents import Document as LCDocument
 
 from ..exception import NotFoundException
-from ..model import Dataset, DatasetQuery, Segment
+from ..lib.helper import conbine_documents
+from ..model import Dataset, DatasetQuery, Segment, Account
 from langchain.retrievers import EnsembleRetriever
+from langchain_core.tools import BaseTool, tool
+from langchain_core.pydantic_v1 import BaseModel, Field
 
 
 @inject
@@ -36,16 +41,13 @@ class RetrievalService(BaseService):
             self,
             dataset_ids: list[UUID],
             query: str,
-            retrieval_strategy: str = RetrieverStrategy.SEMANTIC,  # 默认向量检索（SEMANTIC：语义）
+            account_id: UUID,
+            retrieval_strategy: str = RetrievalStrategy.SEMANTIC,  # 默认向量检索（SEMANTIC：语义）
             k: int = 4,
             score: float = 0,
-            retriever_source: str = RetrieverSource.HIT_TESTING
+            retrieval_source: str = RetrievalSource.HIT_TESTING,
     ) -> list[LCDocument]:
         """根据传递的query+知识库列表执行检索，并返回检索的文档+得分数据（如果检索策略为全文检索，则得分为0）"""
-
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.提取知识库列表并校验权限，同时更新知识库id
         datasets = self.db.session.query(Dataset).filter(
             Dataset.id.in_(dataset_ids),
@@ -79,9 +81,9 @@ class RetrievalService(BaseService):
         )
 
         # 3.根据不同的检索策略执行检索,获取前k条数据
-        if retrieval_strategy == RetrieverStrategy.SEMANTIC:
+        if retrieval_strategy == RetrievalStrategy.SEMANTIC:
             lc_documents = semantic_retriever.invoke(query)[:k]
-        elif retrieval_strategy == RetrieverStrategy.FULL_TEXT:
+        elif retrieval_strategy == RetrievalStrategy.FULL_TEXT:
             lc_documents = full_text_retriever.invoke(query)[:k]
         else:
             lc_documents = hybrid_retriever.invoke(query)[:k]
@@ -93,7 +95,7 @@ class RetrievalService(BaseService):
                 DatasetQuery,
                 dataset_id=dataset_id,
                 query=query,
-                source=retriever_source,
+                source=retrieval_source,
                 # todo:等待APP配置模块完成后进行调整
                 source_app_id=None,
                 created_by=account_id,
@@ -109,3 +111,42 @@ class RetrievalService(BaseService):
             self.db.session.execute(stmt)
 
         return lc_documents
+
+    def create_langchain_tool_from_search(
+            self,
+            flask_app: Flask,
+            dataset_ids: list[UUID],
+            account_id: UUID,
+            retrieval_strategy: str = RetrievalStrategy.SEMANTIC,  # 默认向量检索（SEMANTIC：语义）
+            k: int = 4,
+            score: float = 0,
+            retrieval_source: str = RetrievalSource.HIT_TESTING,
+    ) -> BaseTool:
+        """根据传递的参数构建一个langchain知识库搜索工具"""
+
+        class DatasetRetrievalInput(BaseModel):
+            """知识库检索工具输入结构"""
+            query: str = Field(description="知识库搜索query语句，类型为字符串")
+
+        @tool(DATASET_RETRIEVAL_TOOL_NAME, args_schema=DatasetRetrievalInput)
+        def dataset_retrieval(query: str) -> str:
+            """如果需要搜索扩展的知识库内容，当你觉得用户的提问超过你的知识范围时，可以尝试调用该工具，输入为搜索query语句，返回数据为检索内容字符串"""
+            # 1.调用search_in_datasets检索得到LangChain文档列表
+            with flask_app.app_context():
+                documents = self.search_in_datasets(
+                    dataset_ids=dataset_ids,
+                    query=query,
+                    account_id=account_id,
+                    retrieval_strategy=retrieval_strategy,
+                    k=k,
+                    score=score,
+                    retrieval_source=retrieval_source,
+                )
+
+            # 2.将langchain文档列表转换成字符串后返回
+            if len(documents) == 0:
+                return "知识库内没有检索到对应内容"
+
+            return conbine_documents(documents)
+
+        return dataset_retrieval

@@ -11,7 +11,6 @@ from flask_migrate import Migrate
 
 from internal.middleware import Middleware
 from pkg.sqlalchemy import SQLAlchemy
-from injector import Injector, Binder, Module
 from internal.server import Http
 from internal.router import Router
 from config import Config

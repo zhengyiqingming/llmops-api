@@ -19,7 +19,7 @@ from internal.core.tools.api_tools.entities import ToolEntity, ParameterTypeMap,
 
 @inject
 @dataclass
-class ApiToolProviderManager(BaseModel):
+class ApiProviderManager(BaseModel):
     """Api工具提供者管理器，能根据传递的工具配置信息生成自定义Langchain工具"""
 
     @classmethod

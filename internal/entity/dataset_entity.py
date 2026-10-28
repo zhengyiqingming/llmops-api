@@ -60,14 +60,14 @@ class SegmentStatus(str, Enum):
     ERROR = "error"
 
 
-class RetrieverStrategy(str, Enum):
+class RetrievalStrategy(str, Enum):
     """检索策略类型枚举"""
     FULL_TEXT = "full_text"  # 全文
     SEMANTIC = "semantic"  # 相似性检索
     HYBRID = "hybrid"  # 混合检索
 
 
-class RetrieverSource(str, Enum):
+class RetrievalSource(str, Enum):
     """检索来源"""
     HIT_TESTING = "hit_testing"
     APP = "app"

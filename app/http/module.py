@@ -7,8 +7,9 @@
 """
 from redis import Redis
 
+from internal.core.language_model import LanguageModelManager
 from pkg.sqlalchemy import SQLAlchemy
-from injector import Module, Binder, Injector
+from injector import Module, Binder, Injector, singleton
 
 from internal.extension.database_extension import db
 from internal.extension.redis_extension import redis_client
@@ -27,6 +28,11 @@ class ExtensionModule(Module):
         binder.bind(Migrate, to=migrate)
         binder.bind(Redis, to=redis_client)
         binder.bind(LoginManager, to=login_manager)
+        binder.bind(
+            LanguageModelManager,
+            to=lambda: LanguageModelManager(),  # 使用工厂函数
+            scope=singleton
+        )
 
 
 injector = Injector([ExtensionModule])

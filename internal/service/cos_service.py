@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from qcloud_cos import CosS3Client, CosConfig
 from werkzeug.datastructures import FileStorage
 from internal.entity.upload_file_entity import ALLOWED_IMAGE_EXTENSION, ALLOWED_DOCUMENT_EXTENSION
-from internal.exception import FailedException
+from internal.exception import FailException
 from .upload_file_service import UploadFileService
-from ..model import UploadFile
+from ..model import UploadFile, Account
 
 
 @inject
@@ -26,18 +26,16 @@ class CosService:
     """腾讯云对象存储服务"""
     upload_file_service: UploadFileService
 
-    def upload_file(self, file: FileStorage, only_image: bool = False) -> UploadFile:
+    def upload_file(self, account: Account, file: FileStorage, only_image: bool = False) -> UploadFile:
         """上传文件到腾讯云COS对象存储，上传后返回文件的信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
 
         # 1.提取文件扩展名并检测是否可以上传
         filename = file.filename
         extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
         if extension.lower() not in (ALLOWED_IMAGE_EXTENSION + ALLOWED_DOCUMENT_EXTENSION):
-            raise FailedException(f"该{extension}扩展的文件不允许上传")
+            raise FailException(f"该{extension}扩展的文件不允许上传")
         elif only_image and extension.lower() not in ALLOWED_IMAGE_EXTENSION:
-            raise FailedException(f"该{extension}扩展的文件不支持上传，请上传正确的图片")
+            raise FailException(f"该{extension}扩展的文件不支持上传，请上传正确的图片")
 
         # 2.获取客户端+存储桶名字
         client = self._get_client()
@@ -55,11 +53,11 @@ class CosService:
             # 5.将数据上传到cos存储中
             client.put_object(bucket, file_content, upload_filename)
         except Exception as e:
-            raise FailedException("上传文件失败，请稍后重试")
+            raise FailException("上传文件失败，请稍后重试")
 
         # 6.创建upload_file记录
         return self.upload_file_service.create_upload_file(
-            account_id=account_id,
+            account_id=account.id,
             name=filename,
             key=upload_filename,
             size=len(file_content),

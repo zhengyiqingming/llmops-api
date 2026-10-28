@@ -19,7 +19,7 @@ from wtforms.validators import (
 from internal.lib.helper import datetime_to_timestamp
 from internal.model import Dataset, DatasetQuery
 from pkg.paginator import PaginatorReq
-from internal.entity.dataset_entity import RetrieverStrategy
+from internal.entity.dataset_entity import RetrievalStrategy
 
 
 class CreateDatasetReq(FlaskForm):
@@ -125,7 +125,7 @@ class HitReq(FlaskForm):
     ])
     retrieval_strategy = StringField("retrieval_strategy", validators=[
         DataRequired("检索策略不能为空"),
-        AnyOf([item.value for item in RetrieverStrategy], message="检索策略格式错误")
+        AnyOf([item.value for item in RetrievalStrategy], message="检索策略格式错误")
     ])
     k = IntegerField("k", validators=[
         DataRequired("最大召回数量不能为空"),

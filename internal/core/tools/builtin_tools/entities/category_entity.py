@@ -6,7 +6,7 @@
 @File : category_entity.py
 """
 from pydantic import BaseModel, field_validator
-from internal.exception import FailedException
+from internal.exception import FailException
 
 
 class CategoryEntity(BaseModel):
@@ -19,5 +19,5 @@ class CategoryEntity(BaseModel):
     def check_icon_extension(cls, value: str):
         """校验icon的扩展名是不是.svg，如果不是则抛出错误"""
         if not value.endswith('.svg'):
-            raise FailedException("该分类的icon图标并不是.svg格式")
+            raise FailException("该分类的icon图标并不是.svg格式")
         return value

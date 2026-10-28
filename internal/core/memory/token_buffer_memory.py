@@ -5,6 +5,7 @@
 @Author : 751363075@qq.com
 @File : token_buffer_memory.py
 """
+import tiktoken
 from dataclasses import dataclass
 
 from langchain_core.messages import AnyMessage, HumanMessage, AIMessage, trim_messages, get_buffer_string
@@ -38,7 +39,7 @@ class TokenBufferMemory:
             Message.conversation_id == self.conversation.id,
             Message.answer != "",
             Message.is_deleted == False,
-            Message.status == MessageStatus.NORMAL,
+            Message.status.in_([MessageStatus.NORMAL, MessageStatus.STOP, MessageStatus.TIMEOUT]),
         ).order_by(desc("created_at")).limit(messages_limit).all()
         messages = list(reversed(messages))
 
@@ -50,12 +51,30 @@ class TokenBufferMemory:
                 AIMessage(content=message.answer),
             ])
 
-        # 4.调用LangChain继承的trim_messages函数剪切消息列表
+        # 4. 构造一个临时的 token 计算函数
+        def py_token_counter(messages: list) -> int:
+            try:
+                # 尝试获取 cl100k_base 编码（GPT-3.5/4 标准）
+                encoding = tiktoken.get_encoding("cl100k_base")
+            except Exception:
+                encoding = tiktoken.get_encoding("gpt2")
+
+            num_tokens = 0
+            for message in messages:
+                # 每条消息自带一些元数据开销（role, name等），近似加 4 个 token
+                num_tokens += 4
+                num_tokens += len(encoding.encode(message.content))
+            num_tokens += 2  # 每一个回复还有总体的启动 token
+            return num_tokens
+
+        # 5.调用LangChain继承的trim_messages函数剪切消息列表
         return trim_messages(
             messages=prompt_messages,
             max_tokens=max_token_limit,
-            token_counter=self.model_instance,
-            stratagy="last",  # 保留最新的数据，裁切最早的数据
+            token_counter=py_token_counter,  # 传入精确计算器
+            strategy="last",  # 保留最新的数据，裁切最早的数据
+            start_on="human",
+            end_on="ai",
         )
 
     def get_history_prompt_text(

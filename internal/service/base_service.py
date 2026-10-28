@@ -8,7 +8,7 @@
 from typing import Any, Optional
 
 from pkg.sqlalchemy import SQLAlchemy
-from internal.exception import FailedException
+from internal.exception import FailException
 
 
 class BaseService:
@@ -35,7 +35,7 @@ class BaseService:
                 if hasattr(model_instance, field):
                     setattr(model_instance, field, value)
                 else:
-                    raise FailedException("更新数据失败")
+                    raise FailException("更新数据失败")
         return model_instance
 
     def get(self, model: Any, primary_key: Any) -> Optional[Any]:

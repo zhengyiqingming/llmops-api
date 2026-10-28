@@ -44,7 +44,7 @@ metadatas = [
 ]
 
 # 2.创建连接客户端
-client = weaviate.connect_to_local("192.168.10.161", "8080")
+client = weaviate.connect_to_local("192.168.70.128", "8080")
 # client = weaviate.connect_to_weaviate_cloud(
 #     cluster_url="https://3ds1l8qiqji2vxxgomgfmw.c0.asia-southeast1.gcp.weaviate.cloud",
 #     auth_credentials=AuthApiKey(

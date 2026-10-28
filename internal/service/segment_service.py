@@ -23,9 +23,9 @@ from . import KeywordTableService, VectorDataBaseService
 from .base_service import BaseService
 from ..entity.cache_entity import LOCK_SEGMENT_UPDATE_ENABLED, LOCK_EXPIRE_TIME
 from ..entity.dataset_entity import SegmentStatus, DocumentStatus
-from ..exception import NotFoundException, FailedException, ValidateErrorException
+from ..exception import NotFoundException, FailException, ValidateErrorException
 from ..lib.helper import generate_text_hash
-from ..model import Segment, Document
+from ..model import Segment, Document, Account
 from ..schema.segment_schema import GetSegmentsWithPageReq, CreateSegmentReq, UpdateSegmentReq
 from .embeddings_service import EmbeddingsService
 from .jieba_service import JiebaService
@@ -43,11 +43,8 @@ class SegmentService(BaseService):
     keyword_table_service: KeywordTableService
     vector_database_service: VectorDataBaseService
 
-    def create_segment(self, dataset_id: UUID, document_id: UUID, req: CreateSegmentReq) -> Segment:
+    def create_segment(self, dataset_id: UUID, document_id: UUID, req: CreateSegmentReq, account: Account) -> Segment:
         """根据传递的信息新增文档片段信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.校验上传内容的token长度总数，不能超过1000
         token_count = self.embeddings_service.caculate_token_count(req.content.data)
         if token_count > 1000:
@@ -57,14 +54,14 @@ class SegmentService(BaseService):
         document = self.get(Document, document_id)
         if (
                 document is None
-                or str(document.account_id) != account_id
+                or document.account_id != account.id
                 or document.dataset_id != dataset_id
         ):
             raise NotFoundException("该知识库文档不存在，或无权限新增，请核实后重试")
 
         # 3.判断文档的状态是否可以新增片段数据，只有completed才能新增
         if document.status != DocumentStatus.COMPLETED:
-            raise FailedException("当前文档不可新增片段，请稍后尝试")
+            raise FailException("当前文档不可新增片段，请稍后尝试")
 
         # 4.提取文档片段的最大位置
         position = self.db.session.query(func.coalesce(func.max(Segment.position), 0)).filter(
@@ -81,7 +78,7 @@ class SegmentService(BaseService):
             position += 1
             segment = self.create(
                 Segment,
-                account_id=account_id,
+                account_id=account.id,
                 dataset_id=dataset_id,
                 document_id=document_id,
                 node_id=uuid.uuid4(),
@@ -145,18 +142,19 @@ class SegmentService(BaseService):
                     disabled_at=datetime.now(),
                     stopped_at=datetime.now(),
                 )
-            raise FailedException("新增文档片段失败，请稍后尝试")
+            raise FailException("新增文档片段失败，请稍后尝试")
 
     def get_segments_with_page(
-            self, dataset_id: UUID, document_id: UUID, req: GetSegmentsWithPageReq
+            self,
+            dataset_id: UUID,
+            document_id: UUID,
+            req: GetSegmentsWithPageReq,
+            account: Account,
     ) -> tuple[list[Segment], Paginator]:
         """根据传递的信息获取片段列表分页数据"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取文档并校验权限
         document = self.get(Document, document_id)
-        if document is None or document.dataset_id != dataset_id or str(document.account_id) != account_id:
+        if document is None or document.dataset_id != dataset_id or document.account_id != account.id:
             raise NotFoundException("该知识库文档不存在，或无权限查看，请核实后重试")
 
         # 2.构建分页查询器
@@ -174,16 +172,13 @@ class SegmentService(BaseService):
 
         return segments, paginator
 
-    def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID) -> Segment:
+    def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, account: Account) -> Segment:
         """根据传递的信息获取片段详情信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取片段信息并校验权限
         segment = self.get(Segment, segment_id)
         if (
                 segment is None
-                or str(segment.account_id) != account_id
+                or segment.account_id != account.id
                 or segment.dataset_id != dataset_id
                 or segment.document_id != document_id
         ):
@@ -192,17 +187,19 @@ class SegmentService(BaseService):
         return segment
 
     def update_segment_enabled(
-            self, dataset_id: UUID, document_id: UUID, segment_id: UUID, enabled: bool
+            self,
+            dataset_id: UUID,
+            document_id: UUID,
+            segment_id: UUID,
+            enabled: bool,
+            account: Account,
     ) -> Segment:
         """根据传递的信息更新文档片段的启用状态信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取片段信息并校验权限
         segment = self.get(Segment, segment_id)
         if (
                 segment is None
-                or str(segment.account_id) != account_id
+                or segment.account_id != account.id
                 or segment.dataset_id != dataset_id
                 or segment.document_id != document_id
         ):
@@ -210,17 +207,17 @@ class SegmentService(BaseService):
 
         # 2.判断文档片段是否处于可启用/禁用状态
         if segment.status != SegmentStatus.COMPLETED:
-            raise FailedException("当前片段不可修改状态，请稍后尝试")
+            raise FailException("当前片段不可修改状态，请稍后尝试")
 
         # 3.判断更新的片段启用状态和数据库的数据是否一致，如果是则抛出错误
         if enabled == segment.enabled:
-            raise FailedException(f"片段状态修改错误，当前已是{'启用' if enabled else '禁用'}")
+            raise FailException(f"片段状态修改错误，当前已是{'启用' if enabled else '禁用'}")
 
         # 4.获取更新片段启用状态锁并上锁检测
         cache_key = LOCK_SEGMENT_UPDATE_ENABLED.format(segment_id=segment_id)
         cache_result = self.redis_client.get(cache_key)
         if cache_result is not None:
-            raise FailedException("当前文档片段正在修改状态，请稍后尝试")
+            raise FailException("当前文档片段正在修改状态，请稍后尝试")
 
         # 5.上锁并更新对应的数据，涵盖postgres记录，weaviate、关键词表
         with self.redis_client.lock(cache_key, LOCK_EXPIRE_TIME):
@@ -254,18 +251,15 @@ class SegmentService(BaseService):
                     disabled_at=datetime.now(),
                     stopped_at=datetime.now(),
                 )
-                raise FailedException("更新文档片段启用状态失败，请稍后重试")
+                raise FailException("更新文档片段启用状态失败，请稍后重试")
 
-    def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID) -> Segment:
+    def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, account: Account) -> Segment:
         """根据传递的信息删除指定的文档片段信息，该服务是同步方法"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取片段信息并校验权限
         segment = self.get(Segment, segment_id)
         if (
                 segment is None
-                or str(segment.account_id) != account_id
+                or segment.account_id != account.id
                 or segment.dataset_id != dataset_id
                 or segment.document_id != document_id
         ):
@@ -273,7 +267,7 @@ class SegmentService(BaseService):
 
         # 2.判断文档是否处于可以删除的状态，只有COMPLETED/ERROR才可以删除
         if segment.status not in [SegmentStatus.COMPLETED, SegmentStatus.ERROR]:
-            raise FailedException("当前文档片段处于不可删除状态，请稍后尝试")
+            raise FailException("当前文档片段处于不可删除状态，请稍后尝试")
 
         # 3.删除文档片段并获取该片段的文档信息
         document = segment.document
@@ -304,17 +298,19 @@ class SegmentService(BaseService):
         return segment
 
     def update_segment(
-            self, dataset_id: UUID, document_id: UUID, segment_id: UUID, req: UpdateSegmentReq,
+            self,
+            dataset_id: UUID,
+            document_id: UUID,
+            segment_id: UUID,
+            req: UpdateSegmentReq,
+            account: Account,
     ) -> Segment:
         """根据传递的信息更新指定的文档片段信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取片段信息并校验权限
         segment = self.get(Segment, segment_id)
         if (
                 segment is None
-                or str(segment.account_id) != account_id
+                or segment.account_id != account.id
                 or segment.dataset_id != dataset_id
                 or segment.document_id != document_id
         ):
@@ -322,7 +318,7 @@ class SegmentService(BaseService):
 
         # 2.判断文档是否处于可以修改的状态，只有COMPLETED才可以修改
         if segment.status != SegmentStatus.COMPLETED:
-            raise FailedException("当前文档片段处于不可修改状态，请稍后尝试")
+            raise FailException("当前文档片段处于不可修改状态，请稍后尝试")
 
         # 3.检测是否传递了keywords，如果没有传递的话，调用jieba服务生成关键词
         if req.keywords.data is None or len(req.keywords.data) == 0:
@@ -373,6 +369,6 @@ class SegmentService(BaseService):
                 )
         except Exception as e:
             logging.exception(f"更新文档片段记录失败，segment_id：{segment.id},错误信息：{str(e)}")
-            raise FailedException("更新文档片段记录失败，请稍后尝试")
+            raise FailException("更新文档片段记录失败，请稍后尝试")
 
         return segment

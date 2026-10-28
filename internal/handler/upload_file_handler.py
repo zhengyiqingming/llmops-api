@@ -5,6 +5,7 @@
 @Author : 751363075@qq.com
 @File : upload_file_handler.py
 """
+from flask_login import login_required, current_user
 from injector import inject
 from dataclasses import dataclass
 
@@ -19,6 +20,7 @@ class UploadFileHandler:
     """上传文件处理器"""
     cos_service: CosService
 
+    @login_required
     def upload_file(self):
         """上传文件/文档"""
         # 1.构建请求并校验
@@ -27,12 +29,13 @@ class UploadFileHandler:
             return validate_error_json(req.errors)
 
         # 2.调用服务上传文件并获取记录
-        upload_file = self.cos_service.upload_file(req.file.data)
+        upload_file = self.cos_service.upload_file(current_user, req.file.data, False)
 
         # 3.构建响应并返回
         resp = UploadFileResp()
         return success_json(resp.dump(upload_file))
 
+    @login_required
     def upload_image(self):
         """上传图片"""
         # 1.构建请求并校验
@@ -41,7 +44,7 @@ class UploadFileHandler:
             return validate_error_json(req.errors)
 
         # 2.调用服务并上传文件
-        upload_file = self.cos_service.upload_file(req.file.data, True)
+        upload_file = self.cos_service.upload_file(current_user, req.file.data, True)
 
         # 3.获取图片的实际URL地址
         image_url = self.cos_service.get_file_url(upload_file.key)

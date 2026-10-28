@@ -22,14 +22,14 @@ def validate_password(password: str, pattern: str = password_pattern):
     return
 
 
+def compare_password(password: str, password_hashed_base64: Any, salt_base64: Any) -> bool:
+    """根据传递的密码+盐值校验比对是否一致"""
+    return hash_password(password, base64.b64decode(salt_base64)) == base64.b64decode(password_hashed_base64)
+
+
 def hash_password(password: str, salt: Any) -> bytes:
     """将传入的密码+盐值进行哈希加密"""
     # 得到二进制数据
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 10000)
     # 转为16进制
     return binascii.hexlify(dk)
-
-
-def compare_password(password: str, password_hashed_base64: Any, salt_base64: Any) -> bool:
-    """根据传递的密码+盐值校验比对是否一致"""
-    return hash_password(password, base64.b64decode(salt_base64)) == base64.b64decode(password_hashed_base64)

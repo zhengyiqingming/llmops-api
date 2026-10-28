@@ -12,6 +12,17 @@ from .upload_file_handler import UploadFileHandler
 from .dataset_handler import DatasetHandler
 from .document_handler import DocumentHandler
 from .segment_handler import SegmentHandler
+from .oauth_handler import OAuthHandler
+from .account_handler import AccountHandler
+from .auth_handler import AuthHandler
+from .ai_handler import AIHandler
+from .api_key_handler import ApiKeyHandler
+from .openapi_handler import OpenApiHandler
+from .builtin_app_handler import BuiltinAppHandler
+from .workflow_handler import WorkflowHandler
+from .language_model_handler import LanguageModelHandler
+from .assistant_agent_handler import AssistantAgentHandler
+from .analysis_handler import AnalysisHandler
 
 __all__ = [
     'AppHandler',
@@ -21,4 +32,15 @@ __all__ = [
     "DatasetHandler",
     "DocumentHandler",
     "SegmentHandler",
+    "OAuthHandler",
+    "AccountHandler",
+    "AuthHandler",
+    "AIHandler",
+    "ApiKeyHandler",
+    "OpenApiHandler",
+    "BuiltinAppHandler",
+    "WorkflowHandler",
+    "LanguageModelHandler",
+    "AssistantAgentHandler",
+    "AnalysisHandler",
 ]

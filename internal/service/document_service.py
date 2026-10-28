@@ -22,9 +22,9 @@ from .base_service import BaseService
 from ..entity.cache_entity import LOCK_DOCUMENT_UPDATE_ENABLED, LOCK_EXPIRE_TIME
 from ..entity.dataset_entity import ProcessType, SegmentStatus, DocumentStatus
 from internal.entity.upload_file_entity import ALLOWED_DOCUMENT_EXTENSION
-from ..exception import ForbiddenException, FailedException, NotFoundException
+from ..exception import ForbiddenException, FailException, NotFoundException
 from ..lib.helper import datetime_to_timestamp
-from ..model import Document, Dataset, UploadFile, ProcessRule, Segment
+from ..model import Document, Dataset, UploadFile, ProcessRule, Segment, Account
 from internal.task.document_task import build_documents, update_document_enabled, delete_document
 from ..schema.document_schema import GetDocumentsWithPageReq
 from redis import Redis
@@ -39,23 +39,21 @@ class DocumentService(BaseService):
 
     def create_documents(
             self,
+            account: Account,
             dataset_id: UUID,
             upload_file_ids: list[UUID],
             process_type: str = ProcessType.AUTOMATIC,
             rule: dict = None
     ) -> tuple[list[Document], str]:
         """根据传递的信息创建文档列表并调用异步任务"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.检测知识库权限
         dataset = self.get(Dataset, dataset_id)
-        if dataset is None or str(dataset.account_id) != account_id:
+        if dataset is None or dataset.account_id != account.id:
             raise ForbiddenException("当前用户无该知识库权限或该知识库不存在")
 
         # 2.提取文件并校验文件权限与文件扩展
         upload_files = self.db.session.query(UploadFile).filter(
-            UploadFile.account_id == account_id,
+            UploadFile.account_id == account.id,
             UploadFile.id.in_(upload_file_ids)
         ).all()
         upload_files = [
@@ -64,15 +62,15 @@ class DocumentService(BaseService):
         ]
         if len(upload_files) == 0:
             logging.warning(
-                f"上传文档列表未解析到合法文件，account_id:{account_id},dataset_id:{dataset_id},upload_file_ids:{upload_file_ids}"
+                f"上传文档列表未解析到合法文件，account_id:{account.id},dataset_id:{dataset_id},upload_file_ids:{upload_file_ids}"
             )
-            raise FailedException("暂未解析到合法文件，请重新上传")
+            raise FailException("暂未解析到合法文件，请重新上传")
 
         # 3.创建批次与处理规则并记录到数据库中
         batch = time.strftime("%Y%m%d%H%M%S") + str(random.randint(100000, 999999))
         process_rule = self.create(
             ProcessRule,
-            account_id=account_id,
+            account_id=account.id,
             dataset_id=dataset_id,
             mode=process_type,
             rule=rule,
@@ -87,7 +85,7 @@ class DocumentService(BaseService):
             position += 1
             document = self.create(
                 Document,
-                account_id=account_id,
+                account_id=account.id,
                 dataset_id=dataset_id,
                 upload_file_id=upload_file.id,
                 process_rule_id=process_rule.id,
@@ -103,14 +101,11 @@ class DocumentService(BaseService):
         # 7.返回文档列表与处理批次
         return documents, batch
 
-    def get_documents_status(self, dataset_id: UUID, batch: str) -> list[dict]:
+    def get_documents_status(self, dataset_id: UUID, batch: str, account: Account) -> list[dict]:
         """根据传递的知识库id+处理批次获取文档列表的状态"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.检测知识库权限
         dataset = self.get(Dataset, dataset_id)
-        if dataset is None or str(dataset.account_id) != account_id:
+        if dataset is None or dataset.account_id != account.id:
             raise ForbiddenException("当前用户无该知识库权限或该知识库不存在")
 
         # 2.查询当前知识库下该批次的文档列表
@@ -156,42 +151,33 @@ class DocumentService(BaseService):
 
         return documents_status
 
-    def get_document(self, dataset_id: UUID, document_id: UUID) -> Document:
+    def get_document(self, dataset_id: UUID, document_id: UUID, account: Account) -> Document:
         """根据传递的知识库id+处理批次获取文档列表的状态"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         document = self.get(Document, document_id)
         if document is None:
             raise NotFoundException("该文档不存在，请核实后重试")
-        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+        if document.dataset_id != dataset_id or document.account_id != account.id:
             raise ForbiddenException("当前用户无权限获取该文档，请核实后重试")
 
         return document
 
-    def update_document(self, dataset_id: UUID, document_id: UUID, **kwargs) -> Document:
+    def update_document(self, account: Account, dataset_id: UUID, document_id: UUID, **kwargs) -> Document:
         """根据传递的知识库id+文档id，更新文档信息"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         document = self.get(Document, document_id)
         if document is None:
             raise NotFoundException("该文档不存在，请核实后重试")
-        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+        if document.dataset_id != dataset_id or document.account_id != account.id:
             raise ForbiddenException("当前用户无权限修改该文档，请核实后重试")
 
         return self.update(document, **kwargs)
 
-    def update_document_enabled(self, dataset_id: UUID, document_id: UUID, enabled: bool) -> Document:
+    def update_document_enabled(self, dataset_id: UUID, document_id: UUID, enabled: bool, account: Account) -> Document:
         """根据传递的知识库id+文档id，更新文档的启用状态，同时会异步更新weaviate向量数据库中的数据"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取文档并校验权限
         document = self.get(Document, document_id)
         if document is None:
             raise NotFoundException("该文档不存在，请核实后重试")
-        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+        if document.dataset_id != dataset_id or document.account_id != account.id:
             raise ForbiddenException("当前用户无权限修改知识库下的文档，请核实后重试")
 
         # 2.判断文档是否处于可以修改的状态，只有构建完成才可以修改enabled
@@ -206,7 +192,7 @@ class DocumentService(BaseService):
         cache_key = LOCK_DOCUMENT_UPDATE_ENABLED.format(document_id=document.id)
         cache_result = self.redis_client.get(cache_key)
         if (cache_result is not None):
-            raise FailedException("当前文档正在修改启用状态，请稍后再次尝试")
+            raise FailException("当前文档正在修改启用状态，请稍后再次尝试")
 
         # 5.修改文档的启用状态并设置缓存键，缓存时间为600s
         self.update(
@@ -221,21 +207,18 @@ class DocumentService(BaseService):
 
         return document
 
-    def delete_document(self, dataset_id: UUID, document_id: UUID) -> Document:
+    def delete_document(self, dataset_id: UUID, document_id: UUID, account: Account) -> Document:
         """根据传递的知识库id+文档id删除文档信息，涵盖：文档片段删除、关键词更新、weaviate向量数据库记录删除"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 1.获取文档并校验权限
         document = self.get(Document, document_id)
         if document is None:
             raise NotFoundException("该文档不存在，请核实后重试")
-        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+        if document.dataset_id != dataset_id or document.account_id != account.id:
             raise ForbiddenException("当前用户无权限删除知识库下的文档，请核实后重试")
 
         # 2.判断文档是否处于可删除状态，只有构建完成/出错状态下才可以删除，其他情况需要等待构建完成
         if document.status not in [DocumentStatus.COMPLETED, DocumentStatus.ERROR]:
-            raise FailedException("当前文档处于不可删除状态，请稍后重试")
+            raise FailException("当前文档处于不可删除状态，请稍后重试")
 
         # 3.删除postgres中的文档基础信息
         self.delete(document)
@@ -246,15 +229,15 @@ class DocumentService(BaseService):
         return document
 
     def get_documents_with_page(
-            self, dataset_id: UUID, req: GetDocumentsWithPageReq
+            self,
+            dataset_id: UUID,
+            req: GetDocumentsWithPageReq,
+            account: Account
     ) -> tuple[list[Document], Paginator]:
         """根据传递的知识库id+请求数据获取文档分页列表数据"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "d2c06181-11bd-45be-8b93-b0b9fc4448a2"
-
         # 2.获取知识库并校验权限
         dataset = self.get(Dataset, dataset_id)
-        if dataset is None or str(dataset.account_id) != account_id:
+        if dataset is None or dataset.account_id != account.id:
             raise NotFoundException("该知识库不存在，或无权限")
 
         # 2.构建分页查询器
@@ -262,7 +245,7 @@ class DocumentService(BaseService):
 
         # 3.构建筛选器
         filters = [
-            Document.account_id == account_id,
+            Document.account_id == account.id,
             Document.dataset_id == dataset_id,
         ]
         if req.search_word.data:

@@ -23,13 +23,22 @@ def init_app(app: Flask):
     log_file = os.path.join(log_folder, "app.log")
 
     # 3.设置日志的格式，并且让日志每天更新一次
-    handler = TimedRotatingFileHandler(
-        log_file,
-        when="midnight",
-        interval=1,
-        backupCount=30,
-        encoding="utf-8"
-    )
+    # Windows 环境下多进程/线程切分日志会引发 WinError 32，故在 Windows 下改用普通 FileHandler
+    if os.name == "nt":
+        from logging import FileHandler
+        handler = FileHandler(
+            log_file,
+            encoding="utf-8"
+        )
+    else:
+        handler = TimedRotatingFileHandler(
+            log_file,
+            when="midnight",
+            interval=1,
+            backupCount=30,
+            encoding="utf-8"
+        )
+
     formatter = logging.Formatter(
         "[%(asctime)s.%(msecs)03d] %(filename)s -> %(funcName)s line:%(lineno)d [%(levelname)s]: %(message)s",
     )

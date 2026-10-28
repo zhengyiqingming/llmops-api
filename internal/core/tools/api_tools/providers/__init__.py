@@ -5,6 +5,6 @@
 @Author : 751363075@qq.com
 @File : __init__.py.py
 """
-from .api_provider_manager import ApiToolProviderManager
+from .api_provider_manager import ApiProviderManager
 
-__all__ = ["ApiToolProviderManager"]
+__all__ = ["ApiProviderManager"]

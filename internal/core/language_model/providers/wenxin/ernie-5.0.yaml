@@ -1,0 +1,27 @@
+model: ernie-5.0
+label: ernie-5.0
+model_type: chat
+features:
+  - tool_call
+  - agent_thought
+context_window: 32768
+max_output_tokens: 8192
+attributes:
+  model: ernie-5.0
+parameters:
+  - name: temperature
+    use_template: temperature
+    max: 1
+    default: 0.8
+  - name: top_p
+    use_template: top_p
+    #存在惩罚
+  - name: presence_penalty
+    use_template: presence_penalty
+    #频率惩罚
+  - name: frequency_penalty
+    use_template: frequency_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    default: 4096
+    max: 8192

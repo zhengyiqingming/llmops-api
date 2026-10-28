@@ -5,7 +5,7 @@
 @Author : 751363075@qq.com
 @File : __init__.py.py
 """
-from internal.schema.app_schema import CompletionReq
+from internal.schema.app_schema import CreateAppReq
 from .schema import ListField
 
-__all__ = ['CompletionReq', 'ListField']
+__all__ = ['CreateAppReq', 'ListField']

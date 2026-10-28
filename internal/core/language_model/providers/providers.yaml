@@ -1,0 +1,37 @@
+- name: openai
+  label: OpenAI
+  description: OpenAI公司提供的模型，例如GPT-4o-mini和GPT-4o。
+  icon: icon.svg
+  background: "#E5E7EB"
+  supported_model_types:
+    - chat
+    - completion
+- name: deepseek
+  label: 深度求索
+  description: 深度求索提供的模型，例如deepseek-chat和deepseek-reasoner。
+  icon: icon.png
+  background: "#FFFFFF"
+  supported_model_types:
+    - chat
+    - completion
+- name: tongyi
+  label: 通义千问
+  description: 阿里通义千问提供的模型，例如qwen3.7-plus和qwen3.8-max。
+  icon: icon.png
+  background: "#FFFFFF"
+  supported_model_types:
+    - chat
+- name: wenxin
+  label: 文心一言
+  description: 百度文心一言提供的模型，例如ERNIE 5.1和ERNIE 4.5 Turbo。
+  icon: icon.png
+  background: "#FFFFFF"
+  supported_model_types:
+    - chat
+- name: ollama
+  label: Ollama
+  description: Ollama提供的本地离线大语言模型，例如qwen3.8:latest等。
+  icon: icon.svg
+  background: "#F9FAFB"
+  supported_model_types:
+    - chat

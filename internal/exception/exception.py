@@ -23,7 +23,7 @@ class CustomException(Exception):
         self.data = data
 
 
-class FailedException(CustomException):
+class FailException(CustomException):
     """通用失败异常"""
     pass
 

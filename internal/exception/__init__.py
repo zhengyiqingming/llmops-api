@@ -7,7 +7,7 @@
 """
 from internal.exception.exception import (
     CustomException,
-    FailedException,
+    FailException,
     NotFoundException,
     UnauthorizedException,
     ForbiddenException,
@@ -16,7 +16,7 @@ from internal.exception.exception import (
 
 __all__ = [
     "CustomException",
-    "FailedException",
+    "FailException",
     "NotFoundException",
     "UnauthorizedException",
     "ForbiddenException",
