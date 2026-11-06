@@ -1,4 +1,4 @@
-model: deepseek-v2:latest
+model: deepseek-v2
 label: 通义千问deepseek-v2:latest
 model_type: chat
 features:

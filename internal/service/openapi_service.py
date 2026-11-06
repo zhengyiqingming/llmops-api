@@ -90,7 +90,7 @@ class OpenAPIService(BaseService):
 
         # 7.获取校验后的运行时配置
         app_config = self.app_config_service.get_app_config(app)
-        print("app_config:", app_config)
+
         # 8.新建一条消息记录
         message = self.create(Message, **{
             "app_id": app_id,
@@ -125,12 +125,19 @@ class OpenAPIService(BaseService):
                 flask_app=current_app._get_current_object(),
                 dataset_ids=[dataset["id"] for dataset in app_config["datasets"]],
                 account_id=account.id,
-                retriever_source=RetrievalSource.APP,
+                retrieval_source=RetrievalSource.APP,
                 **app_config["retrieval_config"],
             )
             tools.append(dataset_retrieval)
 
-        # 10.根据LLM是否支持tool_call决定使用不同的Agent
+        # 14.检测是否关联工作流，如果关联了工作流则将工作流构建成工具添加到tools中
+        if app_config["workflows"]:
+            workflow_tools = self.app_config_service.get_langchain_tools_by_workflow_ids(
+                [workflow["id"] for workflow in app_config["workflows"]],
+            )
+            tools.extend(workflow_tools)
+
+        # 14.根据LLM是否支持tool_call决定使用不同的Agent
         agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
         print("long_term_memory--enable:", app_config["long_term_memory"]["enable"])
         agent = agent_class(

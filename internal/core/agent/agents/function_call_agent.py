@@ -6,10 +6,11 @@
 @File : function_call_agent.py
 """
 import json
-import logging
 import re
 import time
 import uuid
+import logging
+import tiktoken
 from typing import Literal, Generator
 
 from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, RemoveMessage, ToolMessage, AIMessage
@@ -100,13 +101,18 @@ class FunctionCallAgent(BaseAgent):
                 event=QueueEvent.LONG_TERM_MEMORY_RECALL,
                 observation=long_term_memory,
             ))
-
+        # 新增：动态生成可用工具列表的提示词
+        tools_prompt = ""
+        if self.agent_config.tools:
+            tools_prompt = "\n\n【重要：你当前拥有以下工具，请严格按照名字调用，不要编造不存在的工具】\n"
+            for tool in self.agent_config.tools:
+                tools_prompt += f"- 工具名: `{tool.name}`\n  描述: {tool.description}\n"
         # 2.构建预设消息列表，并将preset_prompt+long_term_memory填充到系统消息中
         preset_messages = [
             SystemMessage(AGENT_SYSTEM_PROMPT_TEMPLATE.format(
                 preset_prompt=self.agent_config.preset_prompt,
                 long_term_memory=long_term_memory,
-            ))
+            ) + tools_prompt)
         ]
 
         # 3.将短期历史消息添加到消息列表中
@@ -116,7 +122,9 @@ class FunctionCallAgent(BaseAgent):
             if len(history) % 2 != 0:
                 self.agent_queue_manager.publish_error(state["task_id"], "智能体历史消息列表格式错误")
                 logging.exception(
-                    f"智能体历史消息列表格式错误,len(history)={len(history)},history={json.dumps(messages_to_dict(history))}")
+                    "智能体历史消息列表格式错误, len(history)=%(len_history)d, history=%(history)s",
+                    {"len_history": len(history), "history": json.dumps(messages_to_dict(history))},
+                )
                 raise FailException("智能体历史消息列表格式错误")
             # 5，拼接历史消息
             preset_messages.extend(history)
@@ -208,7 +216,10 @@ class FunctionCallAgent(BaseAgent):
                         latency=(time.perf_counter() - start_at),
                     ))
         except Exception as e:
-            logging.exception(f"llm节点发生错误，错误信息：{str(e)}")
+            logging.exception(
+                "LLM节点发生错误, 错误信息: %(error)s",
+                {"error": str(e) or "LLM出现未知错误"}
+            )
             # 1. 发送错误事件
             self.agent_queue_manager.publish_error(state["task_id"], f"llm节点发生错误，错误信息：{str(e)}")
             # 2. 强制发送结束事件，确保 AgentQueueManager 能收到 None 并跳出 listen 循环
@@ -220,8 +231,22 @@ class FunctionCallAgent(BaseAgent):
             raise e
 
         # 8.计算LLM的输入+输出token总数
-        input_token_count = self.llm.get_num_tokens_from_messages(state["messages"])
-        output_token_count = self.llm.get_num_tokens_from_messages([gathered])
+        # input_token_count = self.llm.get_num_tokens_from_messages(state["messages"])
+        # output_token_count = self.llm.get_num_tokens_from_messages([gathered])
+        enc = tiktoken.get_encoding("cl100k_base")  # 适用于多数现代模型的近似估算
+        input_token_count = sum(
+            len(enc.encode(str(m.content))) for m in state["messages"]
+        )
+        # output 侧：兼容 content 为空、gathered 为 None、以及工具调用参数
+        if gathered is None:
+            output_text = ""
+        elif getattr(gathered, "content", ""):
+            output_text = str(gathered.content)
+        else:
+            # 纯工具调用场景：content 为空，但 tool_calls 的参数 JSON 是真实输出
+            output_text = json.dumps(gathered.tool_calls, ensure_ascii=False)
+
+        output_token_count = len(enc.encode(output_text))
 
         # 9.获取输入/输出价格和单位
         input_price, output_price, unit = self.llm.get_pricing()
@@ -302,16 +327,25 @@ class FunctionCallAgent(BaseAgent):
 
             try:
                 # 5.获取工具并调用工具
+                if tool_call["name"] not in tools_by_name:
+                    raise ValueError(f"未找到名为 {tool_call['name']} 的工具")
                 tool = tools_by_name[tool_call["name"]]
                 tool_result = tool.invoke(tool_call["args"])
-            except Exception as e:
-                # 6.添加错误工具信息
-                tool_result = f"工具执行出错，错误信息：{str(e)}"
+                print("tool_result:", tool_result)
 
-            # 7.将工具消息添加到列表中
+                # ================= 使用通用解析函数 =================
+                content_str = self.format_tool_result(tool_result)
+                print("format_tool_result--content_str:", content_str)
+                # ====================================================
+
+            except Exception as e:
+                logging.error(f"工具 [{tool_call['name']}] 执行异常: {e}", exc_info=True)  # 👈 关键
+                content_str = json.dumps({"error": f"工具执行出错，错误信息：{str(e)}"}, ensure_ascii=False)
+
+            # 7.将工具消息添加到消息列表中
             messages.append(ToolMessage(
                 tool_call_id=tool_call["id"],
-                content=json.dumps(tool_result),
+                content=content_str,
                 name=tool_call["name"],
             ))
 
@@ -325,7 +359,7 @@ class FunctionCallAgent(BaseAgent):
                 id=id,
                 task_id=state["task_id"],
                 event=event,
-                observation=json.dumps(tool_result),
+                observation=content_str,
                 tool=tool_call["name"],
                 tool_input=tool_call["args"],
                 latency=(time.perf_counter() - start_at),  # 当前时间-开始时间
@@ -356,3 +390,41 @@ class FunctionCallAgent(BaseAgent):
             return END
 
         return "long_term_memory_recall"
+
+    @classmethod
+    def format_tool_result(cls, tool_result) -> str:
+        """通用的工具结果解析器，将复杂嵌套结构转为大模型友好的 Markdown 纯文本"""
+        if tool_result is None:
+            return "无返回结果"
+
+        # 1. 如果是纯字符串，直接返回
+        if isinstance(tool_result, str):
+            return tool_result
+
+        # 2. 对象转字典
+        if hasattr(tool_result, "model_dump"):
+            tool_result = tool_result.model_dump()
+        elif hasattr(tool_result, "__dict__") and not isinstance(tool_result, dict):
+            tool_result = vars(tool_result)
+
+        # 3. 精准提取内容
+        if isinstance(tool_result, dict):
+            # 优先提取 outputs 里的 llm_output（你最想要的最终回答）
+            outputs = tool_result.get("outputs")
+            if isinstance(outputs, dict) and outputs.get("llm_output"):
+                return str(outputs["llm_output"])
+
+            # 如果没有 outputs，看看有没有直接传 llm_output
+            if tool_result.get("llm_output"):
+                return str(tool_result["llm_output"])
+
+            # 如果都没有，可能调用了其他工具，全量转成格式化的 JSON 兜底
+            try:
+                # 过滤掉 node_results，因为里面全是对象，不仅大模型看不懂还会引发序列化错误
+                clean_result = {k: v for k, v in tool_result.items() if k != "node_results"}
+                return json.dumps(clean_result, ensure_ascii=False, indent=2, default=str)
+            except Exception:
+                return str(tool_result)
+
+        # 4. 兜底：如果是列表（比如 node_results），直接转字符串
+        return str(tool_result)

@@ -50,9 +50,11 @@ class AssistantAgentService(BaseService):
         """传递query与账号实现与辅助Agent进行会话"""
         # 1.获取辅助Agent对应的id
         assistant_agent_id = current_app.config.get("ASSISTANT_AGENT_ID")
+        print("assistant_agent_id:", assistant_agent_id)
 
         # 2.获取当前应用的调试会话信息
         conversation = account.assistant_agent_conversation
+        print("conversation:", conversation)
 
         # 3.新建一条消息记录
         message = self.create(
@@ -92,6 +94,7 @@ class AssistantAgentService(BaseService):
             self.faiss_service.convert_faiss_to_tool(),
             self.convert_create_app_to_tool(account.id)
         ]
+        print("tools:", tools)
 
         # 7.构建Agent智能体，使用functionCallAgent
         agent = FunctionCallAgent(

@@ -38,10 +38,8 @@ class Middleware:
         elif request.blueprint == "openapi":
             # 4.校验获取api_key
             api_key = self._validate_credentials(request)
-
             # 5.解析得到API秘钥记录
             api_key_record = self.api_key_service.get_api_key_by_credential(api_key)
-
             # 6.判断Api秘钥记录是否存在，如果不存在则抛出错误
             if not api_key_record or not api_key_record.is_active:
                 raise UnauthorizedException("该秘钥不存在或未激活")

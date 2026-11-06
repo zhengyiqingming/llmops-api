@@ -193,29 +193,11 @@ class Workflow(BaseTool):
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         """工作流组件基础run方法,这个方法不会被调用，保留作为后备"""
-        # 如果 args 有值，使用 args[0]（通常是传入的字典）
-        if args:
-            # 如果 args[0] 是字典，直接使用
-            if isinstance(args[0], dict):
-                input_dict = args[0]
-            else:
-                input_dict = {"input": args[0]}
-        else:
-            # 否则使用 kwargs
-            input_dict = kwargs
+        # 1.调用工作流获取结果信息
+        result = self._workflow.invoke({"inputs": kwargs})
 
-        # 合并 kwargs 到 input_dict（如果 kwargs 有值）
-        if kwargs:
-            input_dict.update(kwargs)
-
-        # 构建完整的 WorkflowState
-        state = {
-            "inputs": input_dict,
-            "outputs": {},
-            "node_results": []
-        }
-
-        return self._workflow.invoke(state)
+        # 2.提取响应结果的outputs内容作为输出
+        return result.get("outputs", {})
 
     def stream(
             self,

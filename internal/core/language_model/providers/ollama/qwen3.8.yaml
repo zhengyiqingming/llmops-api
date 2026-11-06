@@ -1,4 +1,4 @@
-model: qwen3.8:latest
+model: qwen3.8
 label: 通义千问3.8:latest
 model_type: chat
 features:
