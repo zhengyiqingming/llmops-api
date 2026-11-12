@@ -5,6 +5,8 @@
 @Author : 751363075@qq.com
 @File : upload_file.py
 """
+from datetime import datetime
+
 from sqlalchemy import (
     Column,
     UUID,
@@ -13,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     PrimaryKeyConstraint,
     text,
+    Index,
 )
 
 from internal.extension.database_extension import db
@@ -23,6 +26,7 @@ class UploadFile(db.Model):
     __tablename__ = "upload_file"
     __table_args__ = (
         PrimaryKeyConstraint("id", name="pk_upload_file_id"),
+        Index("upload_file_account_id_idx", "account_id"),
     )
 
     id = Column(UUID, nullable=False, server_default=text('uuid_generate_v4()'))
@@ -37,6 +41,6 @@ class UploadFile(db.Model):
         DateTime,
         nullable=False,
         server_default=text('CURRENT_TIMESTAMP(0)'),
-        server_onupdate=text('CURRENT_TIMESTAMP(0)'),
+        onupdate=datetime.now,
     )
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP(0)'))

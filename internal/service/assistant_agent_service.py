@@ -19,6 +19,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool, tool
 from langchain_openai import ChatOpenAI
 from sqlalchemy import desc
+from sqlalchemy.orm import joinedload
 
 from pkg.paginator import Paginator
 from . import ConversationService
@@ -159,22 +160,15 @@ class AssistantAgentService(BaseService):
             }
             yield f"event:{agent_thought.event}\ndata:{json.dumps(data)}\n\n"
 
-        # 22.循环将消息以及推理过程添加到数据库,装入子线程，不会等到里面逻辑完成之后才结束响应，用户在前面可以发起一个新的响应
-        thread = Thread(
-            target=self.conversation_service.save_agent_thoughts,
-            kwargs={
-                "flask_app": current_app._get_current_object(),
-                "account_id": account.id,
-                "app_id": assistant_agent_id,
-                "app_config": {
-                    "long_term_memory": {"enable": True}
-                },
-                "conversation_id": conversation.id,
-                "message_id": message.id,
-                "agent_thoughts": [agent_thought for agent_thought in agent_thoughts.values()],
-            }
+        # 22.将消息以及推理过程添加到数据库
+        self.conversation_service.save_agent_thoughts(
+            account_id=account.id,
+            app_id=assistant_agent_id,
+            app_config={"long_term_memory": {"enable": True}},
+            conversation_id=conversation.id,
+            message_id=message.id,
+            agent_thoughts=[agent_thought for agent_thought in agent_thoughts.values()],
         )
-        thread.start()
 
     @classmethod
     def stop_chat(self, task_id: UUID, account: Account) -> None:
@@ -197,7 +191,7 @@ class AssistantAgentService(BaseService):
 
         # 4.执行分页并查询数据
         messages = paginator.paginate(
-            self.db.session.query(Message).filter(
+            self.db.session.query(Message).options(joinedload(Message.agent_thoughts)).filter(
                 Message.conversation_id == conversation.id,
                 Message.status.in_([MessageStatus.STOP, MessageStatus.NORMAL]),
                 Message.answer != "",

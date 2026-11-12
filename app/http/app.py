@@ -5,9 +5,22 @@
 @Author : 751363075@qq.com
 @File : http.py
 """
+import os
+
+# 1.为生产环境环境配置猴子补丁
+if os.environ.get("FLASK_DEBUG==0" or os.environ.get("FLASK_ENV") == "production"):
+    from gevent import monkey
+
+    monkey.patch_all()
+
+    import grpc.experimental.gevent
+
+    grpc.experimental.gevent.init_gevent()
+
 import dotenv
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from flask_weaviate import FlaskWeaviate
 
 from internal.middleware import Middleware
 from pkg.sqlalchemy import SQLAlchemy
@@ -26,6 +39,7 @@ app = Http(
     __name__,
     conf=conf,
     db=injector.get(SQLAlchemy),  # 通过类声明获取实例
+    weaviate=injector.get(FlaskWeaviate),
     migrate=injector.get(Migrate),  # 通过类声明获取实例
     login_manager=injector.get(LoginManager),  # 通过类声明获取实例
     middleware=injector.get(Middleware),

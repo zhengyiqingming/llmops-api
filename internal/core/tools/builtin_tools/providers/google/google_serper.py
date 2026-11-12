@@ -10,7 +10,6 @@ from langchain_community.utilities import GoogleSerperAPIWrapper
 from langchain_core.tools import BaseTool
 from langchain_core.pydantic_v1 import BaseModel, Field
 
-from internal.core.tools.builtin_tools.providers.gaode.gaode_weather import GaodeWeatherArgsSchema
 from internal.lib.helper import add_attribute
 
 

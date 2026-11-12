@@ -5,6 +5,8 @@
 @Author  : thezehui@gmail.com
 @File    : conversation.py
 """
+from datetime import datetime
+
 from sqlalchemy import (
     Column,
     UUID,
@@ -16,9 +18,13 @@ from sqlalchemy import (
     Numeric,
     Float,
     text,
-    PrimaryKeyConstraint, func, asc,
+    PrimaryKeyConstraint,
+    func,
+    asc,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 
 from internal.extension.database_extension import db
 
@@ -29,6 +35,8 @@ class Conversation(db.Model):
     __tablename__ = "conversation"
     __table_args__ = (
         PrimaryKeyConstraint("id", name="pk_conversation_id"),
+        Index("conversation_app_id_idx", "app_id"),
+        Index("conversation_app_created_by_idx", "created_by"),
     )
 
     id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))
@@ -46,7 +54,7 @@ class Conversation(db.Model):
         DateTime,
         nullable=False,
         server_default=text('CURRENT_TIMESTAMP(0)'),
-        server_onupdate=text('CURRENT_TIMESTAMP(0)'),
+        onupdate=datetime.now,
     )
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP(0)'))
 
@@ -65,6 +73,8 @@ class Message(db.Model):
     __tablename__ = "message"
     __table_args__ = (
         PrimaryKeyConstraint("id", name="pk_message_id"),
+        Index("message_conversation_id_idx", "conversation_id"),
+        Index("message_created_by_idx", "created_by"),
     )
 
     id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))
@@ -105,16 +115,21 @@ class Message(db.Model):
         DateTime,
         nullable=False,
         server_default=text('CURRENT_TIMESTAMP(0)'),
-        server_onupdate=text('CURRENT_TIMESTAMP(0)'),
+        onupdate=datetime.now,
     )
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP(0)'))
 
-    @property
-    def agent_thoughts(self) -> list["MessageAgentThought"]:
-        """只读属性，返回该消息对应的智能体推理过程列表"""
-        return db.session.query(MessageAgentThought).filter(
-            MessageAgentThought.message_id == self.id,
-        ).order_by(asc("position")).all()
+    # 智能体推理列表，创建表关联
+    agent_thoughts = relationship(
+        "MessageAgentThought",  # 目标模型类名（字符串形式，延迟解析，避免循环导入）
+        backref="msg",  # 在 MessageAgentThought 上自动生成一个反向属性 msg，指向所属的 Message。
+        lazy="selectin",
+        # 加载策略。selectin 表示：查询 Message 时，SQLAlchemy 会在同一批里额外发一条 SELECT ... WHERE message_id IN (...) 把关联的 thoughts 一次性捞出来
+        passive_deletes="all",  # 控制删除级联行为。"all" 表示：父对象（Message）被删除时，SQLAlchemy 完全不主动处理子对象
+        uselist=True,  # 表示这是一个集合（一对多返回 list），而不是单个对象。一对多关系默认就是 True，这里显式写出，属于明确表态。
+        foreign_keys=[id],  # 显式指定：用 Message 模型上的 id 列作为本侧参与 join 的列。
+        primaryjoin="MessageAgentThought.message_id == Message.id",
+    )
 
 
 class MessageAgentThought(db.Model):
@@ -122,6 +137,9 @@ class MessageAgentThought(db.Model):
     __tablename__ = "message_agent_thought"
     __table_args__ = (
         PrimaryKeyConstraint("id", name="pk_message_agent_thought_id"),
+        Index("message_agent_thought_app_id_idx", "app_id"),
+        Index("message_agent_thought_conversation_id_idx", "conversation_id"),
+        Index("message_agent_thought_message_id_idx", "message_id"),
     )
 
     id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))
@@ -179,6 +197,6 @@ class MessageAgentThought(db.Model):
         DateTime,
         nullable=False,
         server_default=text('CURRENT_TIMESTAMP(0)'),
-        server_onupdate=text('CURRENT_TIMESTAMP(0)'),
+        onupdate=datetime.now,
     )  # 更新时间
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP(0)'))  # 创建时间

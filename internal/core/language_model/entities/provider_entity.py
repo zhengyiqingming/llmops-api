@@ -48,10 +48,12 @@ class Provider(BaseModel):
 
         # 2.动态导入服务提供商的模型类
         for model_type in provider_entity.supported_model_types:
+            # 3. 安全获取枚举的字符串值（如果 model_type 是枚举取 .value，否则转字符串）
+            type_value = model_type.value if hasattr(model_type, 'value') else str(model_type)
             # 3.将类型的第一个字符转换成大写，其他不变，并构建类映射
-            symbol_name = model_type[0].upper() + model_type[1:]
+            symbol_name = type_value[0].upper() + type_value[1:]
             provider["model_class_map"][model_type] = dynamic_import(
-                f"internal.core.language_model.providers.{provider_entity.name}.{model_type}",
+                f"internal.core.language_model.providers.{provider_entity.name}.{type_value}",
                 symbol_name,
             )
         # 4.获取当前类所在的位置，provider提供商所在的位置

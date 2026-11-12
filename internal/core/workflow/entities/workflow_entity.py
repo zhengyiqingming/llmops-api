@@ -11,7 +11,6 @@ from typing import Any, TypedDict, Annotated
 from uuid import UUID
 
 from langchain_core.pydantic_v1 import BaseModel, Field, root_validator
-from networkx.classes import neighbors
 
 from internal.core.workflow.entities.edge_entity import BaseEdgeData
 from internal.core.workflow.entities.node_entity import NodeResult, BaseNodeData, NodeType

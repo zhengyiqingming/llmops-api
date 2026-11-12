@@ -16,7 +16,7 @@ from internal.entity.conversation_entity import MessageStatus
 class QueueEvent(str, Enum):
     """队列事件枚举类型"""
     LONG_TERM_MEMORY_RECALL = "long_term_memory_recall"  # 长期记忆召回事件
-    AGENT_THOUGHT = "agent_thought"  # 智能体观察事件
+    AGENT_THOUGHT = "agent_thought"  # 智能体推理事件
     AGENT_MESSAGE = "agent_message"  # 智能体消息事件
     AGENT_ACTION = "agent_action"  # 智能体动作
     DATASET_RETRIEVAL = "dataset_retrieval"  # 知识库检索事件

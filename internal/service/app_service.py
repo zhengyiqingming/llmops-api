@@ -25,6 +25,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel
 from langchain_openai import ChatOpenAI
 from sqlalchemy import func, desc
+from sqlalchemy.orm import joinedload
 from werkzeug.datastructures import FileStorage
 
 from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG
@@ -618,22 +619,17 @@ class AppService(BaseService):
             }
             yield f"event: {agent_thought.event}\ndata:{json.dumps(data)}\n\n"
 
-        # 22.循环将消息以及推理过程添加到数据库,装入子线程，不会等到里面逻辑完成之后才结束响应，用户在前面可以发起一个新的响应
-        # todo:将数据库数据存储/更新的操作转换成同步，将summary和conversation_name生成放置到Thread中执行
-        # todo:考虑将错误信息/超时信息也一并存储到answer中，这个需求可以根据不同的业务逻辑做相应的抉择
-        thread = Thread(
-            target=self.conversation_service.save_agent_thoughts,
-            kwargs={
-                "flask_app": current_app._get_current_object(),
-                "account_id": account.id,
-                "app_id": app_id,
-                "app_config": draft_app_config,
-                "conversation_id": debug_conversation.id,
-                "message_id": message.id,
-                "agent_thoughts": [agent_thought for agent_thought in agent_thoughts.values()],
-            }
+        # 22.将消息以及推理过程添加到数据库
+        # 将数据库数据存储/更新的操作转换成同步，将summary和conversation_name生成放置到Thread中执行
+        # 将错误信息/超时信息也一并存储到answer中，这个需求可以根据不同的业务逻辑做相应的抉择
+        self.conversation_service.save_agent_thoughts(
+            account_id=account.id,
+            app_id=app_id,
+            app_config=draft_app_config,
+            conversation_id=debug_conversation.id,
+            message_id=message.id,
+            agent_thoughts=[agent_thought for agent_thought in agent_thoughts.values()],
         )
-        thread.start()
 
     def stop_debug_chat(self, app_id: UUID, task_id: UUID, account: Account) -> None:
         """根据传递的应用id+任务id+账号，停止某个应用的调试会话，中断流式事件"""
@@ -666,7 +662,7 @@ class AppService(BaseService):
 
         # 5.执行分页并查询数据
         messages = paginator.paginate(
-            self.db.session.query(Message).filter(
+            self.db.session.query(Message).options(joinedload(Message.agent_thoughts)).filter(
                 Message.conversation_id == debug_conversation.id,
                 Message.status.in_([MessageStatus.STOP, MessageStatus.NORMAL]),
                 Message.answer != "",

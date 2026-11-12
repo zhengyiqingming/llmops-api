@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@Time : 2026/9/14 16:10
-@Author : 751363075@qq.com
-@File : chat.py
+@Time    : 2024/12/01 11:48
+@Author  : thezehui@gmail.com
+@File    : chat.py
 """
-from internal.core.language_model.entities.model_entity import BaseLanguageModel
-
 from langchain_openai import ChatOpenAI
+
+from internal.core.language_model.entities.model_entity import BaseLanguageModel
 
 
 class Chat(ChatOpenAI, BaseLanguageModel):

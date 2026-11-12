@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@Time : 2026/9/14 16:13
-@Author : 751363075@qq.com
-@File : completion.py
+@Time    : 2024/12/01 11:49
+@Author  : thezehui@gmail.com
+@File    : completion.py
 """
 from langchain_openai import OpenAI
+
 from internal.core.language_model.entities.model_entity import BaseLanguageModel
 
 

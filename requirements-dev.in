@@ -1,0 +1,3 @@
+# -*- coding: utf-8 -*-
+-c requirements.txt #依赖包来源
+pytest #测试环境依赖包

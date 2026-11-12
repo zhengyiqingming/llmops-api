@@ -1,5 +1,7 @@
 .env
 tmp/*
-storage/*
+storage/log
+storage/memory
 .idea/*
-env/*
+venv/*
+test/storage/*

@@ -9,11 +9,18 @@
 DEFAULT_CONFIG = {
     # wft配置
     "WTF_CSRF_ENABLED": "False",
+
     # SQLAlchemy数据库配置项
     "SQLALCHEMY_DATABASE_URI": "",
     "SQLALCHEMY_POOL_SIZE": 30,
     "SQLALCHEMY_POOL_RECYCLE": 3600,
     "SQLALCHEMY_ECHO": "True",
+
+    # Weaviate向量数据库配置
+    "WEAVIATE_HTTP_HOST": "localhost",
+    "WEAVIATE_HTTP_PORT": 8080,
+    "WEAVIATE_GRPC_HOST": "localhost",
+    "WEAVIATE_GRPC_PORT": 50051,
 
     # Redis数据库配置
     "REDIS_HOST": "localhost",

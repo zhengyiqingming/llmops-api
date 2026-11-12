@@ -9,6 +9,7 @@ from redis import Redis
 
 from internal.core.language_model import LanguageModelManager
 from pkg.sqlalchemy import SQLAlchemy
+from flask_weaviate import FlaskWeaviate
 from injector import Module, Binder, Injector, singleton
 
 from internal.extension.database_extension import db
@@ -17,6 +18,7 @@ from flask_migrate import Migrate
 from internal.extension.migrate_extension import migrate
 from flask_login import LoginManager
 from internal.extension.login_extension import login_manager
+from internal.extension.weaviate_extension import weaviate
 
 
 class ExtensionModule(Module):
@@ -25,6 +27,7 @@ class ExtensionModule(Module):
     def configure(self, binder: Binder) -> None:
         # 将类声明绑定到实例上
         binder.bind(SQLAlchemy, to=db)
+        binder.bind(FlaskWeaviate, to=weaviate)
         binder.bind(Migrate, to=migrate)
         binder.bind(Redis, to=redis_client)
         binder.bind(LoginManager, to=login_manager)

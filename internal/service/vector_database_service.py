@@ -6,13 +6,12 @@
 @File : vector_database_service.py
 """
 import os
+from dataclasses import dataclass
 
-import weaviate
+from flask_weaviate import FlaskWeaviate
 from injector import inject
-from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_weaviate import WeaviateVectorStore
-from weaviate import WeaviateClient
 from weaviate.collections import Collection
 
 from .embeddings_service import EmbeddingsService
@@ -22,29 +21,19 @@ COLLECTION_NAME = "Dataset"
 
 
 @inject
+@dataclass
 class VectorDataBaseService:
     """向量数据库服务"""
-    client: WeaviateClient
-    vector_store: WeaviateVectorStore
+    weaviate: FlaskWeaviate  # 通过注入的方法获取Weaviate向量数据库，有利于自动关闭连接
     embeddings_service: EmbeddingsService
 
-    def __init__(self, embeddings_service: EmbeddingsService):
-        """构造函数，完成向量数据库服务的客户端+Langchain向量数据库实例的创建"""
-        # 1.赋值embeddings_service
-        self.embeddings_service = embeddings_service
-
-        # 2.创建/连接weaviate向量数据库
-        self.client = weaviate.connect_to_local(
-            host=os.getenv("WEAVIATE_HOST"),
-            port=int(os.getenv("WEAVIATE_PORT"))
-        )
-
-        # 3.创建Langchain向量数据库
-        self.vector_store = WeaviateVectorStore(
-            client=self.client,
-            index_name=COLLECTION_NAME,
+    @property
+    def vector_store(self) -> WeaviateVectorStore:
+        return WeaviateVectorStore(
+            client=self.weaviate.client,
+            index_name=COLLECTION_NAME,  # 向量数据库的集合名字
             text_key="text",  # 表示向量数据库中，文档内容存入哪一个metadata中
-            embedding=self.embeddings_service.embeddings,
+            embedding=self.embeddings_service.cache_backed_embeddings
         )
 
     def get_retriever(self) -> VectorStoreRetriever:
@@ -53,4 +42,4 @@ class VectorDataBaseService:
 
     @property
     def collection(self) -> Collection:
-        return self.client.collections.get(COLLECTION_NAME)
+        return self.weaviate.client.collections.get(COLLECTION_NAME)
