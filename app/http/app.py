@@ -5,18 +5,6 @@
 @Author : 751363075@qq.com
 @File : http.py
 """
-import os
-
-# 1.为生产环境环境配置猴子补丁
-if os.environ.get("FLASK_DEBUG==0" or os.environ.get("FLASK_ENV") == "production"):
-    from gevent import monkey
-
-    monkey.patch_all()
-
-    import grpc.experimental.gevent
-
-    grpc.experimental.gevent.init_gevent()
-
 import dotenv
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -48,5 +36,5 @@ app = Http(
 
 celery = app.extensions["celery"]
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)

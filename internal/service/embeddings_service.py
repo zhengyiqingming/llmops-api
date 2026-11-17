@@ -31,20 +31,20 @@ class EmbeddingsService:
     def __init__(self, redis: Redis):
         """构造函数，初始化文本嵌入模型客户端、存储器、缓存客户端"""
         self._store = RedisStore(client=redis)
-        self._embeddings = HuggingFaceEmbeddings(
-            model_name="Alibaba-NLP/gte-multilingual-base",
-            cache_folder=os.path.join(os.getcwd(), "internal", "core", "embeddings"),
-            model_kwargs={
-                "trust_remote_code": True,
-            },
-        )
-        # self._embeddings = OpenAIEmbeddings(
-        #     api_key=os.getenv("QIANFAN_API_KEY"),
-        #     base_url=os.getenv("QIANFAN_BASE_URL"),
-        #     model="qwen3-embedding-8b",
-        #     check_embedding_ctx_length=False
+        # self._embeddings = HuggingFaceEmbeddings(
+        #     model_name="Alibaba-NLP/gte-multilingual-base",
+        #     cache_folder=os.path.join(os.getcwd(), "internal", "core", "embeddings"),
+        #     model_kwargs={
+        #         "trust_remote_code": True,
+        #     },
         # )
-        # self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        self._embeddings = OpenAIEmbeddings(
+            api_key=os.getenv("QIANFAN_API_KEY"),
+            base_url=os.getenv("QIANFAN_BASE_URL"),
+            model="qwen3-embedding-8b",
+            check_embedding_ctx_length=False
+        )
+        self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self._cache_backed_embeddings = CacheBackedEmbeddings.from_bytes_store(
             self._embeddings,
             self._store,

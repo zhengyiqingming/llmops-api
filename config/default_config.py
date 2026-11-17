@@ -21,6 +21,7 @@ DEFAULT_CONFIG = {
     "WEAVIATE_HTTP_PORT": 8080,
     "WEAVIATE_GRPC_HOST": "localhost",
     "WEAVIATE_GRPC_PORT": 50051,
+    "WEAVIATE_API_KEY": "",
 
     # Redis数据库配置
     "REDIS_HOST": "localhost",
