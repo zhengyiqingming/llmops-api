@@ -39,12 +39,12 @@ class EmbeddingsService:
         #     },
         # )
         self._embeddings = OpenAIEmbeddings(
-            api_key=os.getenv("QIANFAN_API_KEY"),
-            base_url=os.getenv("QIANFAN_BASE_URL"),
-            model="qwen3-embedding-8b",
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            model="text-embedding-v3",  # 阿里云目前主流且好用的向量化模型
             check_embedding_ctx_length=False
         )
-        self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        # self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self._cache_backed_embeddings = CacheBackedEmbeddings.from_bytes_store(
             self._embeddings,
             self._store,
