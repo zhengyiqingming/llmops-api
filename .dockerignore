@@ -1,0 +1,11 @@
+# .dockerignore 文件内容
+.git
+.idea
+venv
+node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+storage
