@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+    <defs>
+        <!-- 背景颜色：使用了类似通义千问的蓝紫色，你也可以改成 Ollama 官网的黑色 #000000 -->
+        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#6154FF"/>
+            <stop offset="100%" stop-color="#472EE8"/>
+        </linearGradient>
+    </defs>
+
+    <!-- 1. 圆角方形背景 -->
+    <rect width="512" height="512" rx="110" fill="url(#bgGradient)"/>
+
+    <!-- 2. 居中几何羊驼（Llama）图形 -->
+    <g transform="translate(136, 90)">
+        <!-- 羊驼身体轮廓 -->
+        <path d="M 110,100
+             C 70,100 60,140 40,160 
+             C 15,185 0,200 0,240 
+             C 0,280 20,310 60,310 
+             L 150,310 
+             C 180,310 200,290 210,250 
+             L 230,140 
+             L 210,140 
+             L 190,230 
+             C 185,250 175,260 160,260 
+             L 100,260 
+             L 110,140 
+             Z"
+              fill="#FFFFFF"/>
+
+        <!-- 羊驼脖子与头部轮廓 -->
+        <path d="M 110,140
+             L 110,70 
+             C 110,50 130,40 145,50 
+             L 165,70 
+             C 175,80 185,85 200,85 
+             L 240,85 
+             C 255,85 265,95 265,110 
+             C 265,125 255,135 240,135 
+             L 200,135 
+             C 175,135 160,145 150,165 
+             L 140,200 
+             L 110,200 
+             Z"
+              fill="#FFFFFF"/>
+
+        <!-- 羊驼耳朵 -->
+        <path d="M 125,50 L 115,10 C 112,0 122,-5 128,0 L 150,30 Z" fill="#FFFFFF"/>
+
+        <!-- 羊驼眼睛 -->
+        <circle cx="215" cy="105" r="8" fill="#472EE8"/>
+    </g>
+
+    <!-- 3. 底部文案 "ollama" -->
+    <text x="256" y="475"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="72"
+          font-weight="800"
+          fill="#FFFFFF"
+          text-anchor="middle"
+          letter-spacing="2">
+        ollama
+    </text>
+</svg>
