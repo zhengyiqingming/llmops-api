@@ -1,0 +1,30 @@
+model: deepseek-v4-flash
+label: deepseek-v4-flash
+model_type: chat
+features:
+  - tool_call
+  - agent_thought
+context_window: 128000
+max_output_tokens: 8192
+attributes:
+  model: deepseek-v4-flash
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    default: 1
+    #存在惩罚
+  - name: presence_penalty
+    use_template: presence_penalty
+    #频率惩罚
+  - name: frequency_penalty
+    use_template: frequency_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    default: 4096
+metadata:
+  pricing:
+    input: 0.0250
+    output: 0.0250
+    unit: 0.001
+    currency: RMB
