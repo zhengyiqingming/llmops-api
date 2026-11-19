@@ -16,7 +16,6 @@ from langchain.embeddings import CacheBackedEmbeddings
 from redis import Redis
 from langchain_openai import OpenAIEmbeddings
 import tiktoken
-from langchain_huggingface import HuggingFaceEmbeddings
 
 
 @inject
