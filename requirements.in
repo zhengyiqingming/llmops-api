@@ -32,7 +32,6 @@ langchain-weaviate==0.0.3
 # Embedding相关
 langchain-huggingface==0.0.3
 sentence-transformers==2.7.0  # 限制版本，避免引入过新的依赖
-torch==2.3.0   # 老师那个txt里没显式写torch，但transformers 4.48依赖这个左右
 
 # LLM大语言模型相关
 langchain-openai==0.1.25 # OpenAI
@@ -48,7 +47,6 @@ pandas==2.2.3
 
 #并发与异步处理
 celery==5.4.0
-gevent
 
 #数据存储与检索
 redis==5.2.1
@@ -66,6 +64,3 @@ duckduckgo-search==7.2.1
 
 # 老师文件里有，你之前漏掉的补充包
 gunicorn==23.0.0 #类似于flask，用 Python 编写的、用于 UNIX 系统的 WSGI HTTP 服务器，用来“托管”和“运行”你的 Python Web 应用（比如 Flask 或 Django 写的应用）的程序，负责接收来自外部的 HTTP 请求，并把这些请求转交给你的应用代码去处理
-mistune==3.1.2
-wechatpy==1.8.18
-python-pptx==1.0.2
