@@ -15,7 +15,6 @@ from dataclasses import dataclass
 
 from redis import Redis
 from sqlalchemy import asc, func
-from sympy.abc import q
 
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
