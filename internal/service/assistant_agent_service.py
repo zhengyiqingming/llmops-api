@@ -32,7 +32,7 @@ from internal.core.agent.entities.queue_entity import QueueEvent
 from internal.core.memory import TokenBufferMemory
 from ..core.language_model.entities.model_entity import ModelFeature
 from ..entity.conversation_entity import InvokeFrom, MessageStatus
-from ..schema.assistant_agent_schema import GetAssistantAgentMessageWithPageReq
+from ..schema.assistant_agent_schema import GetAssistantAgentMessageWithPageReq, AssistantAgentChat
 from .faiss_service import FaissService
 from langchain_core.pydantic_v1 import BaseModel, Field
 from internal.task.app_task import auto_create_app
@@ -47,7 +47,7 @@ class AssistantAgentService(BaseService):
     faiss_service: FaissService
     conversation_service: ConversationService
 
-    def chat(self, query, account: Account) -> Generator:
+    def chat(self, req: AssistantAgentChat, account: Account) -> Generator:
         """传递query与账号实现与辅助Agent进行会话"""
         # 1.获取辅助Agent对应的id
         assistant_agent_id = current_app.config.get("ASSISTANT_AGENT_ID")
@@ -62,21 +62,18 @@ class AssistantAgentService(BaseService):
             conversation_id=conversation.id,
             invoke_from=InvokeFrom.DEBUGGER,
             created_by=account.id,
-            query=query,
+            query=req.query.data,
+            image_urls=req.image_urls.data,
             status=MessageStatus.NORMAL,
         )
 
         # 4.使用deepseek作为辅助Agent的LLM大脑
         llm = Chat(
             model="deepseek-v4-flash",
-            temperature=0.8,
+            temperature=0.8,  # temperature=0.8 是大模型（LLM）采样时的一个随机性/创造性参数。简单说：值越高，输出越随机、越发散；值越低，输出越确定、越保守。
             features=[ModelFeature.TOOL_CALL, ModelFeature.AGENT_THOUGHT],
             metadata={}
         )
-        # llm = ChatOpenAI(
-        #     model="deepseek-v4-flash",
-        #     temperature=0.8,  # temperature=0.8 是大模型（LLM）采样时的一个随机性/创造性参数。简单说：值越高，输出越随机、越发散；值越低，输出越确定、越保守。
-        # )
 
         # 5.实例化TokenBufferMemory用于提取短期记忆
         token_buffer_memory = TokenBufferMemory(
@@ -93,7 +90,6 @@ class AssistantAgentService(BaseService):
             self.faiss_service.convert_faiss_to_tool(),
             self.convert_create_app_to_tool(account.id)
         ]
-        print("tools:", tools)
 
         # 7.构建Agent智能体，使用functionCallAgent
         agent = FunctionCallAgent(
@@ -108,7 +104,7 @@ class AssistantAgentService(BaseService):
 
         agent_thoughts = {}
         for agent_thought in agent.stream({
-            "messages": [HumanMessage(query)],
+            "messages": [llm.convert_to_human_message(req.query.data, req.image_urls.data)],
             "history": history,
             "long_term_memory": conversation.summary
         }):

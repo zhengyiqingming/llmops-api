@@ -5,7 +5,6 @@
 @Author : 751363075@qq.com
 @File : app_handler.py
 """
-import uuid
 from uuid import UUID
 from dataclasses import dataclass
 
@@ -195,7 +194,7 @@ class AppHandler:
             return validate_error_json(req.errors)
 
         # 2.调用服务发起会话调试
-        response = self.app_service.debug_chat(app_id, req.query.data, current_user)
+        response = self.app_service.debug_chat(app_id, req, current_user)
 
         return compact_generate_response(response)
 
@@ -235,16 +234,6 @@ class AppHandler:
 
     @login_required
     def ping(self):
-        provider = self.language_model_manager.get_provider("ollama")
-        model_entity = provider.get_model_entity("deepseek-v2")
-        model_class = provider.get_model_class(model_entity.model_type)
-        llm = model_class(**{
-            **model_entity.attributes,
-            "features": model_entity.features,
-            "metadata": model_entity.metadata,
-        })
         return success_json({
-            "content": llm.invoke("你好，你是").content,
-            "features": llm.features,
-            "metadata": llm.metadata,
+            "pong": "success",
         })

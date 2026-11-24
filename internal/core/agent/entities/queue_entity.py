@@ -63,6 +63,7 @@ class AgentResult(BaseModel):
     """智能体推理观察最终结果"""
     # todo:智能体块内容响应，等待开放API模块完成后实现
     query: str = ""  # 原始用户提问
+    image_urls: list[str] = Field(default_factory=list)  # 用户的图片输入列表
 
     message: list[dict] = Field(default_factory=dict)  # 产生最终答案的消息列表
     message_token_count: int = 0  # 消息花费的token数

@@ -98,6 +98,7 @@ class OpenAPIService(BaseService):
             "invoke_from": InvokeFrom.SERVICE_API,
             "created_by": end_user_id,
             "query": req.query.data,
+            "image_urls": req.image_urls.data,
             "status": MessageStatus.NORMAL,
         })
         message_id = message.id
@@ -139,7 +140,6 @@ class OpenAPIService(BaseService):
 
         # 14.根据LLM是否支持tool_call决定使用不同的Agent
         agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
-        print("long_term_memory--enable:", app_config["long_term_memory"]["enable"])
         agent = agent_class(
             llm=llm,
             agent_config=AgentConfig(
@@ -154,7 +154,7 @@ class OpenAPIService(BaseService):
 
         # 15.定义智能体状态基础数据
         agent_state = {
-            "messages": [HumanMessage(req.query.data)],
+            "messages": [llm.convert_to_human_message(req.query.data, req.image_urls.data)],
             "history": history,
             "long_term_memory": conversation.summary,
         }

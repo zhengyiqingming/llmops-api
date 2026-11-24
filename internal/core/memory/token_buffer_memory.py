@@ -47,7 +47,7 @@ class TokenBufferMemory:
         prompt_messages = []
         for message in messages:
             prompt_messages.extend([
-                HumanMessage(content=message.query),
+                self.model_instance.convert_to_human_message(message.query, message.image_urls),
                 AIMessage(content=message.answer),
             ])
 

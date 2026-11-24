@@ -110,24 +110,11 @@ class LanguageModelService(BaseService):
             model_name = model_config.get("model", "")
             parameters = model_config.get("parameters", {})
 
-            print("provider_name:", provider_name)
-            print("model_name:", model_name)
-            print("parameters:", parameters)
             # 2.从模型管理器获取提供者、模型实体、模型类
             provider = self.language_model_manager.get_provider(provider_name)
-            print("provider:", provider)
             model_entity = provider.get_model_entity(model_name)
             model_class = provider.get_model_class(model_entity.model_type)
 
-            print("model_entity:", model_entity)
-            print("model_class:", model_class)
-
-            print(
-                "attributes:",
-                model_entity.attributes
-            )
-            print("features:", model_entity.features)
-            print("metadata:", model_entity.metadata)
             # 3.实例化模型后并返回
             return model_class(
                 **model_entity.attributes,
@@ -145,4 +132,19 @@ class LanguageModelService(BaseService):
     @classmethod
     def load_default_language_model(self) -> BaseLanguageModel:
         """加载默认的大语言模型，在模型管理器中获取不到模型，或者出错时，使用默认模型进行兜底"""
-        return ChatOpenAI(model="deepseek-v4-pro", temperature=1, max_tokens=8192)
+        # 1.获取openai服务提供者与模型类
+        provider = self.language_model_manager.get_provider("deepseek")
+        model_entity = provider.get_model_entity("deepseek-v4-flash")
+        model_class = provider.get_model_class(model_entity.model_type)
+
+        # bug:原先写法使用的是LangChain封装的LLM类，需要替换成自定义封装的类，否则会识别到模型不存在features
+        # return ChatOpenAI(model="deepseek-v4-pro", temperature=1, max_tokens=8192)
+
+        # 2.实例化模型并返回
+        return model_class(
+            **model_entity.attributes,
+            temperature=1,
+            max_tokens=8192,
+            features=model_entity.features,
+            metadata=model_entity.metadata,
+        )

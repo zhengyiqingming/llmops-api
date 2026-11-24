@@ -7,7 +7,7 @@
 """
 import json
 from threading import Thread
-from typing import Generator
+from typing import Generator, Any
 from uuid import UUID
 
 from flask import current_app
@@ -58,6 +58,31 @@ class WebAppService(BaseService):
         # 2.返回查询的应用
         return app
 
+    def get_web_app_info(self, token: str) -> dict[str, Any]:
+        """根据传递的token获取WebApp信息"""
+        # 1.获取App基础信息
+        app = self.get_web_app(token)
+
+        # 2.根据App基础信息构建LLM
+        app_config = self.app_config_service.get_app_config(app)
+        llm = self.language_model_service.load_language_model(app_config.get("model_config", {}))
+
+        # 3.提取信息并返回
+        return {
+            "id": str(app.id),
+            "icon": app.icon,
+            "name": app.name,
+            "description": app.description,
+            "app_config": {
+                "opening_statement": app_config.get("opening_statement"),
+                "opening_questions": app_config.get("opening_questions"),
+                "suggested_after_answer": app_config.get("suggested_after_answer"),
+                "features": llm.features,
+                "text_to_speech": app_config.get("text_to_speech"),
+                "speech_to_text": app_config.get("speech_to_text"),
+            }
+        }
+
     def web_app_chat(self, token: str, req: WebAppChatReq, account: Account) -> Generator:
         """根据传递的token凭证+请求与指定的WebApp进行对话"""
         # 1.获取WebApp应用并校验应用是否发布
@@ -77,13 +102,6 @@ class WebAppService(BaseService):
         else:
             # 3.如果没传递conversation_id表示新会话，这时候需要创建一个会话，如果你不加 **，把字典直接传给函数，代码会报错，因为函数期望接收的是参数，而不是一个包含参数的字典。
             # 加上 ** 之后，Python 会在底层把这个字典自动“拆开”，等同于你写下了下面这一长串代码：
-            # conversation = self.create(
-            #     Conversation,
-            #     app_id=app.id,
-            #     name="New Conversation",
-            #     invoke_from=InvokeFrom.WEB_APP,
-            #     created_by=account.id
-            # )
             conversation = self.create(Conversation, **{
                 "app_id": app.id,
                 "name": "New Conversation",
@@ -102,6 +120,7 @@ class WebAppService(BaseService):
             invoke_from=InvokeFrom.WEB_APP,
             created_by=account.id,
             query=req.query.data,
+            image_urls=req.image_urls.data,
             status=MessageStatus.NORMAL,
         )
 
@@ -157,7 +176,7 @@ class WebAppService(BaseService):
         # 13.定义字典存储推理过程，并调用智能体获取消息
         agent_thoughts = {}
         for agent_thought in agent.stream({
-            "messages": [HumanMessage(req.query.data)],
+            "messages": [llm.convert_to_human_message(req.query.data, req.image_urls.data)],
             "history": history,
             "long_term_memory": conversation.summary,
         }):

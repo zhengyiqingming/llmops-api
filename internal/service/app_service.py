@@ -44,7 +44,7 @@ from internal.model import (
 from internal.schema.app_schema import (
     CreateAppReq,
     GetPublishHistoriesWithPageReq,
-    GetDebugConversationMessagesWithPageReq, GetAppsWithPageReq
+    GetDebugConversationMessagesWithPageReq, GetAppsWithPageReq, DebugChatReq
 )
 from pkg.paginator import Paginator
 from .language_model_service import LanguageModelService
@@ -494,7 +494,7 @@ class AppService(BaseService):
 
         return app
 
-    def debug_chat(self, app_id: UUID, query: str, account: Account) -> Generator:
+    def debug_chat(self, app_id: UUID, req: DebugChatReq, account: Account) -> Generator:
         """根据传递的应用id+提问query向特定的应用发起会话调试"""
         # 1.获取应用信息并校验权限
         app = self.get_app(app_id, account)
@@ -512,7 +512,8 @@ class AppService(BaseService):
             conversation_id=debug_conversation.id,
             invoke_from=InvokeFrom.DEBUGGER,
             created_by=account.id,
-            query=query,
+            query=req.query.data,
+            image_urls=req.image_urls.data,
             status=MessageStatus.NORMAL,
         )
         # 5.从语言模型管理器中加载LLM模型
@@ -529,7 +530,6 @@ class AppService(BaseService):
         )
 
         # 7.将草稿配置中的tools转换成LangChain工具
-        print("draft_app_config--tools:", draft_app_config["tools"])
         tools = self.app_config_service.get_langchain_tools_by_tools_config(draft_app_config["tools"])
 
         # 8.检测是否关联了知识库
@@ -568,7 +568,7 @@ class AppService(BaseService):
 
         agent_thoughts = {}
         for agent_thought in agent.stream({
-            "messages": [HumanMessage(query)],
+            "messages": [llm.convert_to_human_message(req.query.data, req.image_urls.data)],
             "history": history,
             "long_term_memory": debug_conversation.summary,
         }):
