@@ -22,6 +22,7 @@ ENV FLASK_ENV=production
 #非调试模式
 ENV FLASK_DEBUG=0
 ENV NLTK_DATA=/app/api/internal/core/unstructured/nltk_data
+ENV HF_ENDPOINT=https://hf-mirror.com
 
 # 设置容器时区为中国标准时间，避免时区错误
 ENV TZ Asia/Shanghai

@@ -231,6 +231,7 @@ class OpenAPIService(BaseService):
             "end_user_id": str(end_user_id),
             "conversation_id": str(conversation.id),
             "query": req.query.data,
+            "image_urls": req.image_urls.data,
             "answer": agent_result.answer,
             "total_token_count": 0,
             "latency": agent_result.latency,
